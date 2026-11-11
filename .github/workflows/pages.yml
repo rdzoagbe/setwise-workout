@@ -25,6 +25,15 @@ jobs:
         uses: actions/checkout@v4
       - name: Configure Pages
         uses: actions/configure-pages@v5
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      # Fetches the RepDB exercise guides into the deployed artifact only. They are
+      # deliberately not committed: the free-tier licence is in-app use only and
+      # forbids republishing the dataset as a dataset repository.
+      - name: Build exercise guides
+        run: node tools/build-guides.mjs
       - name: Upload site
         uses: actions/upload-pages-artifact@v3
         with:

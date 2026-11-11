@@ -1,5 +1,13 @@
 (() => {
-  const KEY = "setwise-personal-v1";
+  // phone-preview.html loads this app in an iframe with ?demo=1. That frame is
+// same-origin, so without a separate key the preview would read and overwrite
+// the user's real training history. Keep the demo on its own key.
+const IS_DEMO = typeof location !== "undefined" && /[?&]demo=1(&|$)/.test(location.search)
+const KEY = IS_DEMO ? "setwise-demo-v1" : "setwise-personal-v1"
+// Where unreadable data is preserved instead of being discarded. localStorage is
+// the only copy of a user's training history, so read() must never silently wipe.
+const BAK_KEY = KEY + "-recovered"
+let RECOVERY_NOTICE = "";
   const svg = {
     overview:'<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/>',
     train:'<path d="M7 5v14M4 8v8M17 5v14M20 8v8M7 12h10"/>',
@@ -108,7 +116,23 @@
     workouts:[],measurements:[],customExercises:[],activeWorkout:null,
     preferences:{unit:'kg',restSeconds:90,progressExerciseId:'barbell-bench-press',userName:'My training',demoModel:'male',weeklyTarget:4}
   });
-  const read = () => {try {const x=JSON.parse(localStorage.getItem(KEY));if(!x||x.version!==1)return defaults();const d=defaults();return {...d,...x,preferences:{...d.preferences,...(x.preferences||{})},routines:x.routines||[],workouts:x.workouts||[],measurements:x.measurements||[],customExercises:x.customExercises||[]};} catch{return defaults();}};
+  const read = () => {
+    let raw = null; try {raw = localStorage.getItem(KEY);} catch {return defaults();}
+    if (raw == null) return defaults(); // genuine first run: nothing to preserve
+    let x = null; try {x = JSON.parse(raw);} catch {}
+    if (!x || typeof x !== "object" || Array.isArray(x) || x.version !== 1) {
+      // Unreadable or from a version we do not understand. Preserve the raw
+      // payload rather than destroying it, and tell the user once at boot.
+      let kept = false;
+      try {if (localStorage.getItem(BAK_KEY) == null) {localStorage.setItem(BAK_KEY, raw); kept = true;} else {kept = true;}} catch {}
+      RECOVERY_NOTICE = kept
+        ? 'Setwise could not read your saved training data and opened a fresh log. Your previous data was not deleted - this browser still holds it under "' + BAK_KEY + '".'
+        : 'Setwise could not read your saved training data and opened a fresh log, and there was not enough storage space to set the old copy aside.';
+      return defaults();
+    }
+    const d = defaults();
+    return {...d,...x,preferences:{...d.preferences,...(x.preferences||{})},routines:x.routines||[],workouts:x.workouts||[],measurements:x.measurements||[],customExercises:x.customExercises||[]};
+  };
   let deferredInstallPrompt=null, db=read(), view='overview', draft=null, pickerTarget=null, restLeft=0, restTimer=null, customExerciseReturnToWorkout=false;
   const $ = q=>document.querySelector(q), $$=q=>[...document.querySelectorAll(q)];
   const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(db));}catch{notify('Storage is full. Export a backup.','error');}};
@@ -231,6 +255,9 @@
   if('serviceWorker' in navigator&&location.protocol.startsWith('http'))addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
   render();
   loadRepdbLibrary();
+  // read() runs before the DOM exists, so a recovery warning has to wait until
+  // #toast-root is available. Keep it on screen long enough to actually be read.
+  if (RECOVERY_NOTICE) notify(RECOVERY_NOTICE, 'error');
 })();
 
 

@@ -176,7 +176,10 @@
       return '<div class="movement-scene movement-scene-empty" data-movement-scene><span class="scene-empty-mark" aria-hidden="true">↗</span><span>' + message + '</span></div>';
     }
     const paths = record.images && record.images.flat || {};
-    const start = safeImageUrl(paths.start), peak = safeImageUrl(paths.peak);
+    // Static holds (plank, farmer carry) ship a single `main` image rather than a
+    // start/peak pair. Falling back to it makes start === peak, which the
+    // single-figure "Hold position" branch below already renders correctly.
+    const start = safeImageUrl(paths.start || paths.main), peak = safeImageUrl(paths.peak || paths.main);
     if (!start && !peak) return '<div class="movement-scene movement-scene-empty" data-movement-scene><span>Movement pictures are not available for this exercise.</span></div>';
     if (start && peak && start === peak) {
       return '<div class="movement-scene movement-scene-pair" data-movement-scene><figure class="movement-position movement-position-single"><img class="repdb-position-image" src="' + esc(start) + '" alt="' + esc(ex.name) + ' movement position" loading="lazy" decoding="async"><figcaption>Hold position</figcaption></figure></div>';
@@ -207,7 +210,8 @@
     if (clip) return (clip.model === "female" ? "FEMALE" : "MALE") + " VIDEO";
     if (demoModel === "female") return "NO FEMALE CLIP";
     const paths = record && record.images && record.images.flat || {};
-    return safeImageUrl(paths.start) && safeImageUrl(paths.peak) && paths.start !== paths.peak ? "POSE LOOP" : "POSITION GUIDE";
+    const start = paths.start || paths.main, peak = paths.peak || paths.main;
+    return safeImageUrl(start) && safeImageUrl(peak) && start !== peak ? "POSE LOOP" : "POSITION GUIDE";
   }
 
   function guideDisclaimer(ex, record) {
