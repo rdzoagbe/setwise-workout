@@ -2,3 +2,9 @@ __pycache__/
 *.log
 .env
 .env.*
+
+# Generated at build time by tools/build-guides.mjs. Must NOT be committed:
+# RepDB's free-tier licence is in-app use only and forbids republishing the
+# dataset as a dataset repository. See THIRD_PARTY_NOTICES.md.
+bundled-guides.js
+assets/guides/
