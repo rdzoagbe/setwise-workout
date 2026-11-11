@@ -1,0 +1,103 @@
+name: CI
+
+# The deploy workflow only runs on pushes to main, so without this the exercise-guide
+# generator would first be exercised at deploy time -- where a failure breaks the
+# published site instead of a pull request. This runs the same build on every PR.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Check JavaScript syntax
+        run: |
+          for file in app.js exercise-guide.js sw.js; do
+            node --check "$file"
+            echo "  ok  $file"
+          done
+
+      - name: Verify no third-party dataset is committed
+        # RepDB's free-tier licence is in-app use only and forbids republishing the
+        # dataset as a dataset repository, so these must stay generated-only.
+        run: |
+          if git ls-files --error-unmatch bundled-guides.js >/dev/null 2>&1; then
+            echo "::error::bundled-guides.js is tracked by git. It must stay generated-only (see THIRD_PARTY_NOTICES.md)."
+            exit 1
+          fi
+          tracked_images=$(git ls-files 'assets/guides/*' | head -1)
+          if [ -n "$tracked_images" ]; then
+            echo "::error::assets/guides/ is tracked by git. It must stay generated-only (see THIRD_PARTY_NOTICES.md)."
+            exit 1
+          fi
+          echo "  ok  no generated dataset is tracked"
+
+      - name: Build exercise guides
+        run: node tools/build-guides.mjs
+
+      - name: Verify generator output
+        run: |
+          node -e '
+            const fs = require("node:fs");
+            global.window = {};
+            require("./bundled-guides.js");
+            const b = window.SetwiseBundledGuides;
+            const records = Object.keys(b.records);
+            const fail = (m) => { console.error("::error::" + m); process.exit(1); };
+
+            if (records.length < 45) fail(`only ${records.length} guide records generated`);
+
+            // Every image a record points at must resolve to a real file on disk,
+            // and none of them may be a base64 data URI.
+            let checked = 0;
+            for (const key of records) {
+              const flat = (b.records[key].images || {}).flat || {};
+              for (const path of [flat.start || flat.main, flat.peak || flat.main]) {
+                if (!path) continue;
+                const url = b.images[path];
+                if (!url) fail(`record "${key}" references unmapped image ${path}`);
+                if (url.startsWith("data:")) fail(`image ${path} is a base64 data URI, expected a file URL`);
+                const onDisk = url.replace(/^\.\//, "");
+                if (!fs.existsSync(onDisk)) fail(`image file missing on disk: ${onDisk}`);
+                if (fs.statSync(onDisk).size === 0) fail(`image file is empty: ${onDisk}`);
+                checked++;
+              }
+            }
+            console.log(`  ok  ${records.length} records, ${checked} image references resolve to non-empty files`);
+          '
+
+      - name: Verify the app still loads without generated guides
+        # A fresh clone has no generated files. The app must degrade to online
+        # illustrations rather than breaking.
+        run: |
+          mv bundled-guides.js /tmp/guides.js
+          node -e '
+            const fs = require("node:fs");
+            const html = fs.readFileSync("index.html", "utf8");
+            if (!html.includes("bundled-guides.js")) {
+              console.error("::error::index.html no longer references bundled-guides.js");
+              process.exit(1);
+            }
+            const guide = fs.readFileSync("exercise-guide.js", "utf8");
+            if (!guide.includes("window.SetwiseBundledGuides &&")) {
+              console.error("::error::exercise-guide.js no longer guards against a missing guide bundle");
+              process.exit(1);
+            }
+            console.log("  ok  missing guide bundle is guarded against");
+          '
+          mv /tmp/guides.js bundled-guides.js
