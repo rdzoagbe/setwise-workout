@@ -178,6 +178,137 @@ for (const [label, payload] of [
   await ctx.close();
 }
 
+// ---------- 8. Typography is self-hosted, with no third-party requests ----------
+{
+  const ctx = await browser.newContext();
+  const page = await ctx.newPage();
+  const woff = [], thirdParty = [];
+  page.on('response', r => {
+    const u = r.url();
+    if (u.endsWith('.woff2')) woff.push([u.split('/').pop(), r.status(), new URL(u).origin]);
+    if (!u.startsWith(BASE) && !u.startsWith('data:')) thirdParty.push(u);
+  });
+  await page.goto(BASE + '/index.html', { waitUntil: 'networkidle' });
+  await page.waitForTimeout(600);
+  const fonts = await page.evaluate(async () => {
+    await document.fonts.ready;
+    return { manrope: document.fonts.check('700 20px Manrope'),
+             sans: document.fonts.check('400 14px "DM Sans"'),
+             mono: document.fonts.check('500 10px "DM Mono"') };
+  });
+  // Fonts may be served from the service worker cache rather than the network, and
+  // unicode-range means a weight whose glyphs are unused is never fetched. So assert
+  // the files are reachable and same-origin, not that a request happened.
+  const reachable = [];
+  for (const f of ['dm-sans-var', 'manrope-var', 'dm-mono-400', 'dm-mono-500']) {
+    const r = await page.request.get(`${BASE}/assets/fonts/${f}.woff2`);
+    reachable.push([f, r.status()]);
+  }
+  ok('all four webfont files are served from this origin', reachable.every(([, s]) => s === 200),
+     reachable.map(([n, s]) => `${n}:${s}`).join(' '));
+  ok('no webfont is fetched from another origin', woff.every(([, , o]) => o === BASE),
+     woff.length ? woff.map(([n, , o]) => `${n}@${o}`).join(' ') : 'none requested (served from cache)');
+  ok('Manrope, DM Sans and DM Mono are all available', fonts.manrope && fonts.sans && fonts.mono, JSON.stringify(fonts));
+  // The app fetches the RepDB catalog from raw.githubusercontent.com at startup.
+  // That is documented in the README, but it does expose the user's IP to GitHub,
+  // so it must stay the ONLY off-origin request. Anything else is a regression.
+  const KNOWN_OFF_ORIGIN = 'raw.githubusercontent.com';
+  const unexpected = thirdParty.filter(u => !u.includes(KNOWN_OFF_ORIGIN));
+  ok('the RepDB catalog is the only off-origin request', unexpected.length === 0,
+     unexpected.slice(0, 3).join(' ') || `only ${KNOWN_OFF_ORIGIN}`);
+  await ctx.close();
+}
+
+// ---------- 9. Theme: dark by default, light persists, no flash ----------
+{
+  const ctx = await browser.newContext();
+  const page = await ctx.newPage();
+  await page.goto(BASE + '/index.html', { waitUntil: 'networkidle' });
+  const def = await page.evaluate(() => document.documentElement.getAttribute('data-theme'));
+  ok('dark is the default theme', def === 'dark', `got ${def}`);
+
+  await page.evaluate(() => document.querySelector('[data-view="settings"]').click());
+  await page.waitForTimeout(400);
+  await page.evaluate(() => document.querySelector('[data-theme-pref="light"]').click());
+  await page.waitForTimeout(400);
+  const after = await page.evaluate(() => ({
+    attr: document.documentElement.getAttribute('data-theme'),
+    stored: JSON.parse(localStorage.getItem('setwise-personal-v1')).preferences.theme,
+    bg: getComputedStyle(document.body).backgroundColor,
+  }));
+  ok('switching to light applies and is saved', after.attr === 'light' && after.stored === 'light', JSON.stringify(after));
+
+  await page.reload({ waitUntil: 'networkidle' });
+  // The inline head script must set the attribute before first paint, so the
+  // value is already correct without waiting for app.js to boot.
+  const onLoad = await page.evaluate(() => document.documentElement.getAttribute('data-theme'));
+  ok('light theme survives a reload with no dark flash', onLoad === 'light', `got ${onLoad}`);
+  await ctx.close();
+}
+
+// ---------- 10. Every colour resolves; no unresolved custom properties ----------
+{
+  const ctx = await browser.newContext();
+  const page = await ctx.newPage();
+  await page.goto(BASE + '/index.html', { waitUntil: 'networkidle' });
+  const res = await page.evaluate(() => {
+    const css = [...document.styleSheets].flatMap(s => { try { return [...s.cssRules].map(r => r.cssText); } catch { return []; } }).join('');
+    const defined = new Set([...css.matchAll(/(--[a-z0-9-]+)\s*:/g)].map(m => m[1]));
+    const used = new Set([...css.matchAll(/var\((--[a-z0-9-]+)\)/g)].map(m => m[1]));
+    const undef = [...used].filter(u => !defined.has(u));
+    let unresolved = 0;
+    for (const el of document.querySelectorAll('*')) {
+      const c = getComputedStyle(el);
+      for (const prop of ['color', 'background-color', 'border-top-color'])
+        if (c[prop] && !c[prop].startsWith('rgb')) unresolved++;
+    }
+    return { undef, unresolved, tokens: defined.size };
+  });
+  ok('every var() referenced in CSS is defined', res.undef.length === 0, res.undef.slice(0, 5).join(' '));
+  ok('no element has an unresolved colour', res.unresolved === 0, `${res.unresolved} unresolved`);
+  await ctx.close();
+}
+
+// ---------- 11. WCAG AA contrast across every view, in both themes ----------
+{
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 1000 } });
+  const page = await ctx.newPage();
+  await page.goto(BASE + '/index.html', { waitUntil: 'networkidle' });
+  const VIEWS = ['overview', 'train', 'routines', 'exercises', 'progress', 'body', 'tools', 'settings'];
+  for (const theme of ['dark', 'light']) {
+    await page.evaluate(t => document.documentElement.setAttribute('data-theme', t), theme);
+    const fails = [];
+    for (const v of VIEWS) {
+      await page.evaluate(x => { const el = document.querySelector(`[data-view="${x}"]`); if (el) el.click(); }, v);
+      await page.waitForTimeout(250);
+      fails.push(...await page.evaluate((view) => {
+        const lum = c => { const [r, g, b] = c.match(/[\d.]+/g).slice(0, 3).map(Number)
+          .map(v => { v /= 255; return v <= .03928 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4; });
+          return .2126 * r + .7152 * g + .0722 * b; };
+        const bgOf = el => { let e = el; while (e) { const c = getComputedStyle(e).backgroundColor;
+          if (c && c !== 'rgba(0, 0, 0, 0)' && !/,\s*0\)$/.test(c)) return c; e = e.parentElement; } return 'rgb(255,255,255)'; };
+        const out = [];
+        for (const el of document.querySelectorAll('h1,h2,h3,h4,p,span,small,strong,button,a,label,li,td,th')) {
+          const t = (el.textContent || '').trim();
+          if (!t || el.children.length) continue;
+          const cs = getComputedStyle(el);
+          if (cs.display === 'none' || cs.visibility === 'hidden' || !el.offsetParent) continue;
+          if (!cs.color.startsWith('rgb')) continue;
+          const L1 = lum(cs.color), L2 = lum(bgOf(el));
+          const ratio = (Math.max(L1, L2) + .05) / (Math.min(L1, L2) + .05);
+          const size = parseFloat(cs.fontSize), weight = parseInt(cs.fontWeight) || 400;
+          const need = (size >= 24 || (size >= 18.66 && weight >= 700)) ? 3 : 4.5;
+          if (ratio < need) out.push(`${view}: "${t.slice(0, 24)}" ${ratio.toFixed(2)}<${need}`);
+        }
+        return out;
+      }, v));
+    }
+    ok(`${theme} theme passes WCAG AA on all 8 views`, fails.length === 0,
+       fails.length ? `${fails.length} failures, e.g. ${fails.slice(0, 2).join(' | ')}` : 'all text passes');
+  }
+  await ctx.close();
+}
+
 await browser.close();
 
 const failed = results.filter(r => !r.pass);

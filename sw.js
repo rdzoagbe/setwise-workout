@@ -1,9 +1,10 @@
-const CACHE = "setwise-shell-v12";
+const CACHE = "setwise-shell-v13";
 
 // Required shell. cache.addAll() is atomic: if any one of these fails, install
 // rejects and the app gets NO offline support at all. Keep this list to files
 // that are committed to the repository and therefore always present.
-const REQUIRED = ["./", "./index.html", "./styles.css", "./exercise-guide.js", "./app.js", "./manifest.webmanifest"];
+const REQUIRED = ["./", "./index.html", "./styles.css", "./exercise-guide.js", "./app.js", "./manifest.webmanifest",
+  "./assets/fonts/dm-sans-var.woff2", "./assets/fonts/manrope-var.woff2", "./assets/fonts/dm-mono-400.woff2", "./assets/fonts/dm-mono-500.woff2"];
 
 // Optional extras. These are either generated at build time (bundled-guides.js)
 // or non-essential (icons), so they are cached individually and allowed to fail

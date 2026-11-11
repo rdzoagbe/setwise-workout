@@ -55,6 +55,8 @@ Anyone can see the source code in a public repository. Your personal training da
 - One-rep-max and plate-loading calculators
 - Metric/imperial display preference
 - Local JSON backup and restore
+- Dark interface by default, with a light theme in Settings. Both pass WCAG AA contrast on every screen
+- Self-hosted webfonts, so no request ever leaves this origin and the typography works offline
 - Responsive layout and offline app shell; the 19 bundled video demos are local assets, while RepDB illustrations for movements without a local clip require an internet connection
 
 ## Exercise visual credits
