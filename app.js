@@ -41,6 +41,11 @@ const applyTheme = t => document.documentElement.setAttribute('data-theme', t ==
     info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>'
   };
   const I = name => '<svg viewBox="0 0 24 24" aria-hidden="true">' + (svg[name] || svg.dumbbell) + '</svg>';
+  // index.html ships empty <span data-icon="..."> placeholders (sidebar, top bar).
+  // Fill them from the same inline map: no icon font, no request, currentColor.
+  const fillIcons = (root = document) => root.querySelectorAll('[data-icon]').forEach(el => {
+    if (!el.firstElementChild && svg[el.dataset.icon]) el.innerHTML = I(el.dataset.icon);
+  });
   const slug = s => s.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
   const rows = [
     ['Barbell Bench Press','Chest','Barbell','Compound','Set your shoulder blades, lower the bar with control to mid-chest, then press.'],
@@ -255,6 +260,7 @@ const applyTheme = t => document.documentElement.setAttribute('data-theme', t ==
   window.addEventListener('beforeinstallprompt',event=>{event.preventDefault();deferredInstallPrompt=event;syncInstallUI();});
   window.addEventListener('appinstalled',()=>{deferredInstallPrompt=null;syncInstallUI();notify('Setwise installed on this device.');});
   if('serviceWorker' in navigator&&location.protocol.startsWith('http'))addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
+  fillIcons();
   render();
   applyTheme(db.preferences.theme);
   loadRepdbLibrary();
