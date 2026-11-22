@@ -338,7 +338,8 @@ for (const [label, payload] of [
   const page = await ctx.newPage();
   const offOrigin = [];
   page.on('request', r => { if (!r.url().startsWith(BASE) && !r.url().startsWith('data:')) offOrigin.push(r.url()); });
-  await page.goto(BASE + '/index.html', { waitUntil: 'networkidle' });
+  await page.goto(BASE + '/app.html', { waitUntil: 'networkidle' });   // index.html is the landing page since Stage B
+  await skipOnboarding(page);
   const icons = await page.evaluate(() => {
     const nav = [...document.querySelectorAll('.nav-icon')];
     const all = [...document.querySelectorAll('[data-icon]')];
@@ -528,6 +529,8 @@ for (const [label, payload] of [
 {
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   const page = await ctx.newPage();
+  const femaleRequests = [];
+  page.on('request', (r) => { if (r.url().includes('vital-female')) femaleRequests.push(r.url()); });
   await page.goto(BASE + '/app.html', { waitUntil: 'networkidle' });
   await skipOnboarding(page);
   await page.waitForTimeout(1200);
@@ -557,16 +560,19 @@ for (const [label, payload] of [
   ok('male-only clip in female mode says the male one is shown',
      maleOnly.kind === 'video' && /male one is shown/i.test(maleOnly.disclaimer) && !/position guide|illustrated/i.test(maleOnly.disclaimer),
      maleOnly.disclaimer);
+  // The three female sample clips were removed (licence unconfirmed). Hack Squat had
+  // one; it must now fall back and say so, and never claim a female demonstration.
   const hasFemale = await read('hack-squat');
-  ok('a movement with a female clip says it is a female demonstration',
-     hasFemale.kind === 'video' && /^Female demonstration/.test(hasFemale.disclaimer) && hasFemale.key.includes('video:female'),
-     hasFemale.key + ' / ' + hasFemale.disclaimer.slice(0, 40));
+  ok('a movement whose female sample was removed falls back truthfully',
+     !hasFemale.key.includes('female') && !/^Female demonstration/.test(hasFemale.disclaimer) && /No female demonstration/.test(hasFemale.disclaimer),
+     hasFemale.key + ' / ' + hasFemale.disclaimer.slice(0, 60));
   const stills = await read('barbell-bench-press');
   ok('a stills-only movement says the illustrated guide is shown',
      stills.kind === 'illustration' && /illustrated guide is shown/i.test(stills.disclaimer), stills.disclaimer);
   ok('the badge describes the media, never "NO FEMALE CLIP"',
      [maleOnly, hasFemale, stills].every((r) => /^(VIDEO|ILLUSTRATION)$/.test(r.badge)),
      [maleOnly, hasFemale, stills].map((r) => r.badge).join(' | '));
+  ok('female mode never requests a removed female clip', femaleRequests.length === 0, femaleRequests.join(' ') || 'none');
   await ctx.close();
 }
 
