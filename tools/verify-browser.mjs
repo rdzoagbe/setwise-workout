@@ -332,6 +332,51 @@ for (const [label, payload] of [
   await ctx.close();
 }
 
+// ---------- 11b. Sidebar icons are filled from the inline map, and legible ----------
+{
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 1000 } });
+  const page = await ctx.newPage();
+  const offOrigin = [];
+  page.on('request', r => { if (!r.url().startsWith(BASE) && !r.url().startsWith('data:')) offOrigin.push(r.url()); });
+  await page.goto(BASE + '/index.html', { waitUntil: 'networkidle' });
+  const icons = await page.evaluate(() => {
+    const nav = [...document.querySelectorAll('.nav-icon')];
+    const all = [...document.querySelectorAll('[data-icon]')];
+    return {
+      nav: nav.length,
+      navEmpty: nav.filter(el => !el.querySelector(':scope > svg')).map(el => el.dataset.icon),
+      all: all.length,
+      allEmpty: all.filter(el => !el.querySelector(':scope > svg')).map(el => el.dataset.icon),
+    };
+  });
+  ok('every .nav-icon contains an <svg>', icons.nav >= 8 && icons.navEmpty.length === 0,
+     icons.navEmpty.length ? `empty: ${icons.navEmpty.join(', ')}` : `${icons.nav} nav icons`);
+  ok('every [data-icon] placeholder is filled', icons.allEmpty.length === 0,
+     icons.allEmpty.length ? `empty: ${icons.allEmpty.join(', ')}` : `${icons.all} icons`);
+  ok('icons add no off-origin request', !offOrigin.some(u => /\.svg|icon/i.test(u)), offOrigin.filter(u => /\.svg|icon/i.test(u)).join(' '));
+  // WCAG 1.4.11: meaningful graphics need 3:1 against their background.
+  for (const theme of ['dark', 'light']) {
+    await page.evaluate(t => document.documentElement.setAttribute('data-theme', t), theme);
+    const fails = await page.evaluate(() => {
+      const lum = c => { const [r, g, b] = c.match(/[\d.]+/g).slice(0, 3).map(Number)
+        .map(v => { v /= 255; return v <= .03928 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4; });
+        return .2126 * r + .7152 * g + .0722 * b; };
+      const bgOf = el => { let e = el; while (e) { const c = getComputedStyle(e).backgroundColor;
+        if (c && c !== 'rgba(0, 0, 0, 0)' && !/,\s*0\)$/.test(c)) return c; e = e.parentElement; } return 'rgb(255,255,255)'; };
+      const out = [];
+      for (const el of document.querySelectorAll('.nav-icon svg')) {
+        if (!el.closest('.nav-icon').offsetParent) continue;
+        const L1 = lum(getComputedStyle(el).stroke.startsWith('rgb') ? getComputedStyle(el).stroke : getComputedStyle(el).color), L2 = lum(bgOf(el));
+        const ratio = (Math.max(L1, L2) + .05) / (Math.min(L1, L2) + .05);
+        if (ratio < 3) out.push(`${el.closest('.nav-icon').dataset.icon} ${ratio.toFixed(2)}<3`);
+      }
+      return out;
+    });
+    ok(`${theme} theme: nav icons meet 3:1 non-text contrast`, fails.length === 0, fails.join(' | ') || 'all pass');
+  }
+  await ctx.close();
+}
+
 // ---------- 12. Movement stage: one presentation for every state ----------
 {
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
