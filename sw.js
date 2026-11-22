@@ -1,15 +1,15 @@
-const CACHE = "setwise-shell-v14";
+const CACHE = "setwise-shell-v15";
 
 // Required shell. cache.addAll() is atomic: if any one of these fails, install
 // rejects and the app gets NO offline support at all. Keep this list to files
 // that are committed to the repository and therefore always present.
-const REQUIRED = ["./", "./index.html", "./styles.css", "./exercise-guide.js", "./app.js", "./manifest.webmanifest",
+const REQUIRED = ["./app.html", "./styles.css", "./exercise-guide.js", "./app.js", "./manifest.webmanifest",
   "./assets/fonts/dm-sans-var.woff2", "./assets/fonts/manrope-var.woff2", "./assets/fonts/dm-mono-400.woff2", "./assets/fonts/dm-mono-500.woff2"];
 
 // Optional extras. These are either generated at build time (bundled-guides.js)
 // or non-essential (icons), so they are cached individually and allowed to fail
 // without taking the whole install down with them.
-const OPTIONAL = ["./bundled-guides.js", "./icon.svg", "./icon-192.png", "./icon-512.png", "./icon-maskable-512.png"];
+const OPTIONAL = ["./", "./index.html", "./landing.css", "./bundled-guides.js", "./icon.svg", "./icon-192.png", "./icon-512.png", "./icon-maskable-512.png"];
 
 self.addEventListener("install", event => event.waitUntil(
   caches.open(CACHE).then(cache => cache.addAll(REQUIRED).then(() =>
@@ -30,5 +30,14 @@ self.addEventListener("fetch", event => {
       caches.open(CACHE).then(cache => cache.put(event.request, copy));
     }
     return response;
-  }).catch(() => caches.match("./index.html"))));
+  }).catch(() => caches.match(offlineFallback(event.request, requestUrl)))));
 });
+
+// Offline and not cached: a navigation to the app opens the app; a navigation anywhere
+// else (e.g. an older install still launching "./") gets the landing page, whose head
+// script forwards a returning user straight into the app. Anything that is not a
+// navigation falls back to the app shell, as before.
+function offlineFallback(request, url) {
+  if (request.mode === "navigate" && !/\/app\.html$/.test(url.pathname)) return "./index.html";
+  return "./app.html";
+}

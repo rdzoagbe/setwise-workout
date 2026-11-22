@@ -1,3 +1,9 @@
+/* Self-hosted webfonts (SIL Open Font License, texts in assets/fonts/). Same-origin, so
+   no visitor IP reaches a font CDN, and precached by sw.js so they work offline. */
+@font-face{font-family:'DM Sans';src:url('./assets/fonts/dm-sans-var.woff2') format('woff2');font-weight:100 1000;font-style:normal;font-display:swap}
+@font-face{font-family:Manrope;src:url('./assets/fonts/manrope-var.woff2') format('woff2');font-weight:200 800;font-style:normal;font-display:swap}
+@font-face{font-family:'DM Mono';src:url('./assets/fonts/dm-mono-400.woff2') format('woff2');font-weight:400;font-style:normal;font-display:swap}
+@font-face{font-family:'DM Mono';src:url('./assets/fonts/dm-mono-500.woff2') format('woff2');font-weight:500;font-style:normal;font-display:swap}
 /* Colour tokens, generated from the stylesheet's own palette.
    Each colour is tokenised PER ROLE (s=surface, t=text, b=border) because the same
    light grey can be a page background in one rule and text on a dark card in another;
@@ -84,3 +90,51 @@
 .movement-guide-inline .motion-toggle{right:6px;bottom:6px;min-width:40px;height:21px;padding:0 6px;font-size:8px}
 .demo-badge[hidden]{display:none}
 @media(max-width:760px){.movement-guide-inline{--stage-size:min(100%,200px)}}
+
+/* ===== First-run onboarding =====
+   A full-screen "create your profile" flow, shown once on a genuine first visit. Built
+   from the readable alias tokens and existing components (.button, .field,
+   .unit-toggle) so it follows both themes without adding new colours. */
+#onboarding-root{position:relative;z-index:60}
+.onboarding{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;padding:24px 16px;overflow-y:auto;background:var(--paper)}
+.ob-card{display:flex;flex-direction:column;width:min(100%,520px);padding:22px 24px;border:1px solid var(--line);border-radius:22px;background:var(--surface);box-shadow:var(--shadow)}
+.ob-head{display:flex;align-items:center;gap:14px;margin-bottom:22px}
+.ob-head .brand-mark{flex:none}
+.ob-progress{display:flex;flex:1;gap:6px;margin:0;padding:0;list-style:none}
+.ob-progress li{flex:1;height:4px;border-radius:4px;background:var(--line)}
+.ob-progress li.done,.ob-progress li.current{background:var(--accent)}
+.ob-skip{padding:6px 4px;border:0;background:none;color:var(--muted);font:600 12px 'DM Sans',sans-serif;cursor:pointer}
+.ob-skip:hover{color:var(--ink)}
+.ob-body .eyebrow{margin:0 0 6px}
+.ob-body h2{margin:0;color:var(--ink);font:700 24px/1.2 Manrope,sans-serif;letter-spacing:-.6px}
+.ob-body h2:focus{outline:none}
+.ob-lead{margin:8px 0 20px;color:var(--muted);font-size:13px;line-height:1.5}
+.ob-choices{display:grid;gap:10px}
+.ob-choice{display:flex;flex-direction:column;gap:3px;width:100%;padding:14px 16px;border:1px solid var(--line);border-radius:14px;background:transparent;color:var(--ink);text-align:left;cursor:pointer;transition:border-color .15s,background-color .15s}
+.ob-choice strong{font:700 14px Manrope,sans-serif}
+.ob-choice small{color:var(--muted);font-size:12px;line-height:1.4}
+.ob-choice:hover{border-color:var(--quiet)}
+/* The lime tint lightens the card enough to drop --muted below 4.5:1 in the dark theme. */
+.ob-choice[aria-checked="true"] small{color:var(--ink)}
+.ob-choice[aria-checked="true"]{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,transparent);box-shadow:inset 0 0 0 1px var(--accent)}
+.ob-field{margin-bottom:18px}
+.ob-field input{width:100%}
+.ob-label,.ob-field label{display:block;margin-bottom:8px;color:var(--ink);font-size:12px;font-weight:600}
+/* The app's .field label is 9px, which is too small for a first-run form on a phone. */
+.ob-optional{margin-left:6px;color:var(--muted);font-weight:400}
+.ob-units{display:inline-flex}
+.ob-disclaimer{margin:18px 0 0;padding:12px 14px;border:1px solid var(--line);border-radius:12px;color:var(--muted);font-size:11px;line-height:1.5}
+.ob-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:24px}
+.ob-foot .button-primary{justify-content:center;min-width:150px}
+@media(max-width:560px){
+  .onboarding{align-items:stretch;padding:0}
+  .ob-card{width:100%;min-height:100%;padding:20px 18px calc(20px + env(safe-area-inset-bottom));border:0;border-radius:0}
+  .ob-foot{margin-top:auto;padding-top:20px}
+  .ob-body h2{font-size:21px}
+}
+
+/* "More" sheet behind the fifth mobile dock slot. */
+.more-sheet{display:grid;gap:8px}
+.more-link{display:flex;align-items:center;gap:12px;width:100%;padding:14px 16px;border:1px solid var(--line);border-radius:14px;background:transparent;color:var(--ink);font:600 14px 'DM Sans',sans-serif;text-align:left;cursor:pointer}
+.more-link svg{width:20px;height:20px;flex:none}
+.more-link.active{border-color:var(--accent)}
