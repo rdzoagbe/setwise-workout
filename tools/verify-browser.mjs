@@ -422,6 +422,36 @@ for (const [label, payload] of [
   ok('with reduced motion the video starts paused, not autoplaying',
      reduced.paused && !reduced.autoplay && reduced.userPaused === 'true' && reduced.label === 'Play' && reduced.sceneClass, JSON.stringify(reduced));
   await rctx.close();
+
+  // A browser that refuses autoplay outright (e.g. iOS Low Power Mode) must still leave
+  // an honest, one-tap Play button. Codex review on PR #2 found the control said "Pause"
+  // over a stopped video and needed two taps. Playback is allowed here ONLY from a tap
+  // on the control: Playwright's evaluate() carries a user gesture, so plain "user
+  // activation" would wrongly let autoplay through and hide the bug.
+  const bctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  await bctx.addInitScript(() => {
+    let allowed = false;
+    document.addEventListener('pointerdown', (e) => {
+      allowed = !!(e.target.closest && e.target.closest('[data-motion-toggle]'));
+    }, true);
+    const original = HTMLMediaElement.prototype.play;
+    HTMLMediaElement.prototype.play = function () {
+      if (!allowed) return Promise.reject(new DOMException('Autoplay blocked (simulated)', 'NotAllowedError'));
+      return original.call(this);
+    };
+    document.addEventListener('play', (e) => { if (!allowed) e.target.pause(); }, true);
+  });
+  const bpage = await bctx.newPage();
+  await open(bpage);
+  const blocked = await state(bpage);
+  ok('when autoplay is blocked the control offers Play, not Pause',
+     blocked.paused && blocked.label === 'Play' && blocked.pressed === 'true', JSON.stringify(blocked));
+  await bpage.click('[data-movement-scene] [data-motion-toggle]');
+  await bpage.waitForTimeout(600);
+  const started = await state(bpage);
+  ok('one tap on Play starts a video whose autoplay was blocked',
+     !started.paused && started.label === 'Pause' && started.pressed === 'false', JSON.stringify(started));
+  await bctx.close();
 }
 
 // ---------- 14. Female mode tells the truth about what is on screen ----------

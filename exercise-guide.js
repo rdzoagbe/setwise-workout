@@ -212,9 +212,13 @@
       const src = "./assets/vital-" + (clip.model === "female" ? "female/" : "free/") + clip.id + ".mp4";
       // No native controls: the same Play/Pause button as the pose loop, so a list of
       // exercises has one control system. Reduced motion starts paused, as for stills.
-      return open("movement-scene-video", reduced ? " is-paused" : "") + stage(
+      // The control always STARTS in its paused state and is switched to "Pause" only by
+      // the video's own `play` event (see syncVideoControl). Autoplay is a request, not a
+      // guarantee: a browser that blocks it (e.g. iOS Low Power Mode) must leave a usable
+      // Play button, not a "Pause" button on a stopped video.
+      return open("movement-scene-video", " is-paused") + stage(
         '<video class="vital-animation" src="' + esc(src) + '" muted loop playsinline preload="metadata"' + (reduced ? ' data-user-paused="true"' : " autoplay") + ' aria-label="Looping ' + esc(clip.model) + ' demonstration of ' + esc(ex.name) + '"></video>' +
-        toggleButton(reduced));
+        toggleButton(true));
     }
     if (media.kind === "loading") {
       return open("movement-scene-loading") + stage('<div class="stage-message" aria-live="polite"><span class="visual-loading-dot"></span><span>Loading movement pictures…</span></div>');
@@ -348,21 +352,47 @@
     });
   }
 
+  function setControl(scene, paused) {
+    const button = scene.querySelector("[data-motion-toggle]");
+    scene.classList.toggle("is-paused", paused);
+    if (!button) return;
+    button.setAttribute("aria-pressed", String(paused));
+    button.setAttribute("aria-label", paused ? "Play movement preview" : "Pause movement preview");
+    button.textContent = paused ? "Play" : "Pause";
+  }
+
+  // A clip's control reflects the video's ACTUAL state, never a guess about it. Media
+  // events do not bubble, so listen in the capture phase.
+  function syncVideoControl(video) {
+    const scene = video.closest("[data-movement-scene]");
+    if (scene) setControl(scene, video.paused);
+  }
+  ["play", "pause"].forEach(type => document.addEventListener(type, event => {
+    const video = event.target;
+    if (video instanceof HTMLVideoElement && video.classList.contains("vital-animation")) syncVideoControl(video);
+  }, true));
+
   // One Play/Pause control for both the pose loop and the video clip.
   document.addEventListener("click", event => {
     const button = event.target.closest && event.target.closest("[data-motion-toggle]");
     if (!button) return;
     const scene = button.closest("[data-movement-scene]");
     if (!scene) return;
-    const paused = scene.classList.toggle("is-paused");
     const video = scene.querySelector("video.vital-animation");
     if (video) {
-      if (paused) { video.dataset.userPaused = "true"; video.pause(); }
-      else { delete video.dataset.userPaused; video.play().catch(() => {}); }
+      // Act on what the video is really doing, so one tap always does the expected thing
+      // even when autoplay was blocked and the video never started.
+      if (video.paused) {
+        delete video.dataset.userPaused;
+        video.play().catch(() => syncVideoControl(video));
+      } else {
+        video.dataset.userPaused = "true";
+        video.pause();
+      }
+      syncVideoControl(video);   // play()/pause() update `paused` synchronously
+      return;
     }
-    button.setAttribute("aria-pressed", String(paused));
-    button.setAttribute("aria-label", paused ? "Play movement preview" : "Pause movement preview");
-    button.textContent = paused ? "Play" : "Pause";
+    setControl(scene, !scene.classList.contains("is-paused"));
   });
 
   const videoMutationObserver = new MutationObserver(records => {
