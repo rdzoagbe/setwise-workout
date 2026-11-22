@@ -16,31 +16,14 @@
 @media(max-width:680px){body{padding-bottom:70px}.sidebar{display:none}.main-area{margin:0}.topbar{height:59px;padding:0 15px}.breadcrumbs{display:none}.mobile-brand{display:flex;align-items:center;gap:8px}.mobile-brand .brand-mark{width:30px;height:30px;border-radius:9px}.mobile-brand .brand-mark svg{width:22px;height:22px}.mobile-brand strong{font-size:18px}.top-actions{gap:7px}.save-indicator{display:none}.top-action-icon{display:grid}.top-actions .button{min-height:33px;padding:0 10px;font-size:10px}.content-wrap{padding:21px 14px 15px}.page-intro{align-items:flex-start;margin-bottom:17px}.page-intro h1{font-size:23px}.page-intro p{max-width:290px;font-size:10px;line-height:1.5}.page-intro .button{min-height:36px;padding:0 10px;font-size:10px}.overview-hero{grid-template-columns:1fr;gap:10px;margin-bottom:10px}.hero-card{min-height:207px;padding:22px 20px}.hero-card h2{max-width:260px;font-size:24px}.hero-card p{max-width:265px;font-size:10px}.hero-orbit{right:13px;top:48px;width:86px;height:86px;opacity:.38}.hero-orbit svg{width:35px;height:35px}.week-card{min-height:124px;padding:15px 17px}.week-big{font-size:35px}.week-mark{margin-top:9px}.metric-grid{gap:8px;margin-bottom:10px}.metric-card{min-height:94px;padding:13px}.metric-card .metric-label{font-size:9px}.metric-card .metric-icon{width:23px;height:23px}.metric-value{font-size:20px}.metric-sub{font-size:8px}.dashboard-grid{grid-template-columns:1fr;gap:10px}.panel-head{padding:15px 15px 12px}.chart-svg{height:158px}.routine-list{padding:0 11px 12px}.routine-quick{padding:9px}.routine-visual{width:35px;height:35px}.recent-panel{margin-top:10px}.session-list{padding:0 13px 7px}.session-row{grid-template-columns:34px minmax(0,1fr) auto;gap:9px}.session-date{width:33px;height:35px}.session-stat{font-size:9px}.session-stat:last-of-type{display:none}.session-chevron{display:none}.footer{padding-top:20px;flex-direction:column;gap:6px;font-size:7px}.mobile-dock{position:fixed;z-index:25;inset:auto 0 0;display:flex;justify-content:space-around;gap:2px;padding:8px 5px max(8px,env(safe-area-inset-bottom));border-top:1px solid var(--b25);background:var(--sa48);backdrop-filter:blur(14px)}.dock-link{display:grid;justify-items:center;gap:4px;flex:1;padding:3px 0;border:0;background:transparent;color:var(--t79);font-size:8px;font-weight:600}.dock-link svg{width:19px;height:19px}.dock-link.active{color:var(--t95)}.section-toolbar{gap:7px}.search-box{min-width:100%;max-width:none;order:-1}.filter-select{flex:1;min-width:0;height:35px}.section-toolbar>.button{min-height:35px}.toolbar-spacer{display:none}.card-grid,.exercise-grid{grid-template-columns:1fr}.routine-card{min-height:190px}.history-row{grid-template-columns:36px minmax(0,1fr) auto;gap:9px;padding:12px}.date-block{width:35px;height:38px}.history-numbers{gap:9px}.history-numbers div{font-size:9px}.history-numbers div:nth-child(2){display:none}.status-pill{font-size:8px}.metric-wide,.metric-side{grid-column:span 1}.body-entry-form{grid-template-columns:repeat(2,minmax(0,1fr));padding:12px}.body-entry-form .field:first-child{grid-column:span 2}.body-entry-form .button{width:100%}.tool-grid,.settings-grid{grid-template-columns:1fr}.tool-card{padding:15px}.tool-card .tool-form{grid-template-columns:repeat(2,minmax(0,1fr))}.active-banner{padding:12px}.active-banner h2{font-size:13px}.workout-clock{font-size:11px}.trainer-side{grid-template-columns:1fr}.trainer-side .trainer-side-card:last-child{grid-column:span 1}.set-input{width:58px;height:29px}.set-table th{font-size:7px}.trainer-exercise-head{padding:12px}.set-table td{padding:5px 3px}.set-footer{padding:7px 10px 10px}.toast-root{left:12px;right:12px;bottom:82px}.toast{min-width:0}.modal-backdrop{padding:9px}.modal{max-height:94vh}.modal-body{padding:15px}.modal-head,.modal-footer{padding-left:15px;padding-right:15px}.routine-edit-row{grid-template-columns:minmax(0,1fr) 54px 60px 27px;gap:4px}.routine-edit-row select,.routine-edit-row input{height:32px;padding:0 5px;font-size:8px}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition-duration:.01ms!important}}
 .body-entry-form .full{grid-column:1/-1}
-.movement-guide{margin:15px 0 12px;padding:14px;border:1px solid var(--b26);border-radius:14px;background:var(--s49)}.movement-guide-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}.movement-guide-head>div{display:grid;gap:5px}.movement-guide-head .eyebrow{font-size:8px}.movement-guide-head strong{font:700 12px Manrope,sans-serif}.demo-badge{padding:5px 7px;border:1px solid var(--b27);border-radius:6px;background:var(--s36);color:var(--t96);font:500 7px 'DM Mono',monospace;letter-spacing:.45px}.movement-scene{overflow:hidden;border-radius:11px;background:var(--s50)}.demo-disclaimer{margin:5px 0 10px;color:var(--t97);font-size:8px;line-height:1.45}.form-steps{display:grid;gap:7px;margin:0;padding:0;list-style:none}.form-steps li{display:flex;align-items:flex-start;gap:8px}.form-steps li>span{display:grid;place-items:center;flex:none;width:17px;height:17px;border-radius:6px;background:var(--s24);color:var(--t98);font:500 8px 'DM Mono',monospace}.form-steps p{margin:1px 0 0;color:var(--t99);font-size:9px;line-height:1.45}.trainer-exercise-head .small-icon-button{flex:none}.trainer-exercise-head .exercise-card-main{flex:1}.exercise-card .howto-button{flex:none;min-height:29px;padding:0 8px;white-space:nowrap;font-size:9px}.trainer-exercise-head .howto-button{flex:none;min-height:29px;padding:0 8px;white-space:nowrap;font-size:9px}.exercise-card .howto-button:focus-visible,.trainer-exercise-head .howto-button:focus-visible{outline:2px solid var(--b28);outline-offset:2px}
+.movement-guide{margin:15px 0 12px;padding:14px;border:1px solid var(--b26);border-radius:14px;background:var(--s49)}.movement-guide-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}.movement-guide-head>div{display:grid;gap:5px}.movement-guide-head .eyebrow{font-size:8px}.movement-guide-head strong{font:700 12px Manrope,sans-serif}.demo-badge{padding:5px 7px;border:1px solid var(--b27);border-radius:6px;background:var(--s36);color:var(--t96);font:500 7px 'DM Mono',monospace;letter-spacing:.45px}.demo-disclaimer{margin:5px 0 10px;color:var(--t97);font-size:8px;line-height:1.45}.form-steps{display:grid;gap:7px;margin:0;padding:0;list-style:none}.form-steps li{display:flex;align-items:flex-start;gap:8px}.form-steps li>span{display:grid;place-items:center;flex:none;width:17px;height:17px;border-radius:6px;background:var(--s24);color:var(--t98);font:500 8px 'DM Mono',monospace}.form-steps p{margin:1px 0 0;color:var(--t99);font-size:9px;line-height:1.45}.trainer-exercise-head .small-icon-button{flex:none}.trainer-exercise-head .exercise-card-main{flex:1}.exercise-card .howto-button{flex:none;min-height:29px;padding:0 8px;white-space:nowrap;font-size:9px}.trainer-exercise-head .howto-button{flex:none;min-height:29px;padding:0 8px;white-space:nowrap;font-size:9px}.exercise-card .howto-button:focus-visible,.trainer-exercise-head .howto-button:focus-visible{outline:2px solid var(--b28);outline-offset:2px}
 
 
 
 .trainer-exercise .movement-guide-inline+.set-table{border-top:0}
-
-
-/* Licensed RepDB movement references replace the homemade stick-figure previews. */
-.movement-scene-pair{position:relative;display:flex;align-items:center;justify-content:center;gap:10px;min-height:198px;padding:10px 22px;background:radial-gradient(ellipse at center,var(--s13) 0,var(--s50) 100%);border:1px solid var(--b29)}
-.movement-position{display:grid;grid-template-rows:minmax(0,1fr) auto;justify-items:center;align-items:center;flex:1 1 0;min-width:0;height:178px;margin:0}
-.movement-position img{display:block;width:100%;height:155px;object-fit:contain}
-.movement-position figcaption{padding-top:5px;color:var(--t100);font:500 8px 'DM Mono',monospace;letter-spacing:.8px;text-transform:uppercase}
-.movement-position-arrow{flex:none;color:var(--t101);font-size:19px;font-weight:500}
-.movement-position-single{max-width:220px}
-.movement-position-single img{height:165px}
-.movement-scene-loading,.movement-scene-empty{display:flex;align-items:center;justify-content:center;gap:9px;min-height:198px;padding:18px;border:1px solid var(--b29);border-radius:11px;background:linear-gradient(135deg,var(--s51),var(--s52));color:var(--t102);font-size:10px;line-height:1.5;text-align:center}
-.movement-scene-empty{color:var(--t103)}
 .visual-loading-dot{width:8px;height:8px;border-radius:50%;background:var(--s53);box-shadow:0 0 0 5px rgba(163,191,100,.12);animation:visual-pulse 1.4s ease-in-out infinite}
 .scene-empty-mark{display:grid;place-items:center;width:26px;height:26px;flex:none;border-radius:8px;background:var(--s54);color:var(--t104);font-size:14px}
 @keyframes visual-pulse{50%{opacity:.45;transform:scale(.85)}}
-.movement-guide-inline .movement-scene-pair{min-height:164px;padding:8px 16px}
-.movement-guide-inline .movement-position{height:146px}
-.movement-guide-inline .movement-position img{height:122px}
-.movement-guide-inline .movement-position-single img{height:132px}
-.movement-guide-inline .movement-scene-loading,.movement-guide-inline .movement-scene-empty{min-height:164px}
 .movement-guide-inline{grid-template-columns:minmax(190px,.95fr) minmax(220px,1.05fr);grid-template-rows:auto auto auto;gap:0 16px}
 .movement-guide-inline .movement-guide-head{grid-column:1/-1;grid-row:1}
 .movement-guide-inline .movement-scene{grid-column:1;grid-row:2 / span 2;align-self:start}
@@ -49,55 +32,16 @@
 .movement-guide-inline .movement-guide-head strong{font-size:11px}
 .movement-guide-inline .form-steps li{gap:7px}
 .movement-guide-inline .form-steps p{font-size:9px}
-@media(max-width:760px){
-  .trainer-exercise .movement-guide-inline{grid-template-columns:1fr;grid-template-rows:auto;gap:0;padding:11px 12px}
-  .movement-guide-inline .movement-guide-head,.movement-guide-inline .movement-scene,.movement-guide-inline .demo-disclaimer,.movement-guide-inline .form-steps{grid-column:1;grid-row:auto}
-  .movement-guide-inline .movement-scene{margin-bottom:6px}
-  .movement-guide-inline .movement-scene-pair{min-height:180px}
-  .movement-guide-inline .movement-position{height:158px}
-  .movement-guide-inline .movement-position img{height:134px}
-  .movement-guide-inline .movement-scene-loading,.movement-guide-inline .movement-scene-empty{min-height:180px}
-  .movement-guide-inline .demo-disclaimer{margin:6px 0 9px}
-}
-@media(max-width:420px){
-  .movement-scene-pair{gap:5px;padding:8px}
-  .movement-position{height:150px}
-  .movement-position img{height:127px}
-  .movement-position-arrow{font-size:15px}
-}
+@media(max-width:760px){.trainer-exercise .movement-guide-inline{grid-template-columns:1fr;grid-template-rows:auto;gap:0;padding:11px 12px}.movement-guide-inline .movement-guide-head,.movement-guide-inline .movement-scene,.movement-guide-inline .demo-disclaimer,.movement-guide-inline .form-steps{grid-column:1;grid-row:auto}.movement-guide-inline .movement-scene{margin-bottom:6px}.movement-guide-inline .demo-disclaimer{margin:6px 0 9px}}
 
 .footer a{color:var(--t34);text-decoration:none}.footer a:hover{text-decoration:underline;text-underline-offset:2px}
-.movement-scene-video{display:flex;align-items:center;justify-content:center;min-height:198px;background:var(--s55)}
-.movement-scene-video video{display:block;width:184px;height:184px;max-width:100%;object-fit:contain;background:var(--s55)}
-.movement-guide-inline .movement-scene-video{min-height:164px}
-.movement-guide-inline .movement-scene-video video{width:150px;height:150px}
-@media(max-width:760px){.movement-guide-inline .movement-scene-video{min-height:180px}.movement-guide-inline .movement-scene-video video{width:166px;height:166px}}
 .footer a{color:var(--t34);text-decoration:none}.footer a:hover{text-decoration:underline;text-underline-offset:2px}
-
-/* Blend RepDB start/peak poses into a small repeating movement cue. */
-.movement-scene-motion{display:grid;place-items:center;min-height:220px;padding:9px 14px 12px;border:1px solid var(--b29);background:radial-gradient(ellipse at center,var(--s13) 0,var(--s50) 100%)}
-.movement-motion-stage{position:relative;width:min(100%,230px);height:196px;margin:auto;overflow:hidden}
-.motion-frame{position:absolute;inset:0 0 23px;width:100%;height:calc(100% - 23px);object-fit:contain;animation:motion-pose-start 2.4s ease-in-out infinite}
-.motion-frame-peak{animation-name:motion-pose-peak}
-.motion-state{position:absolute;bottom:2px;left:0;padding:4px 7px;border:1px solid var(--b30);border-radius:6px;background:var(--sa56);color:var(--t105);font:500 8px 'DM Mono',monospace;letter-spacing:.7px;animation:motion-pose-start 2.4s ease-in-out infinite}
-.motion-state-peak{animation-name:motion-pose-peak}
-.motion-toggle{position:absolute;right:0;bottom:0;min-width:49px;height:24px;padding:0 8px;border:1px solid var(--b31);border-radius:7px;background:var(--sa57);color:var(--t106);font-size:9px;font-weight:600}
-.motion-toggle:hover{background:var(--s58)}
-.motion-cycle-track{width:min(100%,230px);height:3px;margin:2px auto 0;overflow:hidden;border-radius:4px;background:var(--s59)}
 .motion-cycle-track span{display:block;width:100%;height:100%;transform:scaleX(0);transform-origin:left;border-radius:inherit;background:var(--s60);animation:motion-cycle-progress 2.4s ease-in-out infinite}
 .movement-scene-motion.is-paused .motion-frame,.movement-scene-motion.is-paused .motion-state,.movement-scene-motion.is-paused .motion-cycle-track span{animation-play-state:paused}
 @keyframes motion-pose-start{0%,35%,100%{opacity:1}50%,85%{opacity:0}}
 @keyframes motion-pose-peak{0%,35%,100%{opacity:0}50%,85%{opacity:1}}
 @keyframes motion-cycle-progress{0%,100%{transform:scaleX(0)}50%{transform:scaleX(1)}}
-.movement-guide-inline .movement-scene-motion{min-height:164px;padding:5px 12px 8px}
-.movement-guide-inline .movement-motion-stage{width:min(100%,190px);height:142px}
-.movement-guide-inline .motion-frame{inset:0 0 22px;height:calc(100% - 22px)}
-.movement-guide-inline .motion-cycle-track{width:min(100%,190px)}
-@media(max-width:760px){.movement-guide-inline .movement-scene-motion{min-height:180px;padding:7px 12px 10px}.movement-guide-inline .movement-motion-stage{height:155px}.movement-guide-inline .motion-cycle-track{width:min(100%,210px)}}
-@media(max-width:420px){.movement-scene-motion{min-height:184px;padding:7px 9px 9px}.movement-motion-stage{height:158px}}
-@media(prefers-reduced-motion:reduce){
-  .movement-scene-motion:not(.is-paused) .motion-frame,.movement-scene-motion:not(.is-paused) .motion-state,.movement-scene-motion:not(.is-paused) .motion-cycle-track span{animation-duration:2.4s!important;animation-iteration-count:infinite!important}
-}
+@media(prefers-reduced-motion:reduce){.movement-scene-motion:not(.is-paused) .motion-frame,.movement-scene-motion:not(.is-paused) .motion-state,.movement-scene-motion:not(.is-paused) .motion-cycle-track span{animation-duration:2.4s!important;animation-iteration-count:infinite!important}}
 .demo-model-row>div:first-child{flex:1;min-width:0}
 .demo-model-toggle{flex:none}
 @media(max-width:680px){.demo-model-row{align-items:flex-start;flex-direction:column;gap:9px}.demo-model-toggle{align-self:flex-start}}
@@ -110,3 +54,33 @@
 @media(max-width:680px){.set-table th{padding:8px 2px;font-size:7px}.set-table td{padding:5px 2px}.set-table th:first-child,.set-table td:first-child{width:13%}.set-table th:nth-child(2),.set-table td:nth-child(2){width:27%}.set-table th:nth-child(3),.set-table td:nth-child(3){width:20%}.set-table th:nth-child(4),.set-table td:nth-child(4){width:20%}.set-table th:last-child,.set-table td:last-child{width:20%}.set-input{width:100%;min-width:0;padding:0 3px}.set-done{width:32px;height:32px}.trainer-actions{gap:5px}.trainer-actions button{padding:0 7px;font-size:9px}.support-panel{padding:13px}.support-action{align-items:flex-start;flex-direction:column}}
 
 #install-app-button[hidden]{display:none!important}.install-panel{padding:17px}.install-status{margin:12px 0 10px;color:var(--t30);font-size:11px;line-height:1.5}.install-actions{display:flex;gap:8px;flex-wrap:wrap}.install-footnote{margin:12px 0 0;color:var(--t111);font-size:10px;line-height:1.55}.install-help-lead{margin:0 0 14px;color:var(--t112);font-size:12px;line-height:1.6}.install-steps{display:grid;gap:13px;padding-left:20px;color:var(--t113);font-size:11px;line-height:1.6}.install-steps li{padding-left:3px}.install-steps strong,.install-steps span{display:block}.install-steps strong{color:var(--t114)}.install-steps span{margin-top:3px}.install-steps em{color:var(--t70);font-style:normal;font-weight:700}
+
+/* ===== Movement stage =====
+   Every movement state - video clip, start/peak pose loop, single hold, loading, empty -
+   renders inside ONE square stage, so exercises present identically and a guide that
+   hydrates after the catalog loads cannot shift the layout. The clips (320x320) and the
+   stills (512x512) are both square, so nothing is cropped or letterboxed.
+   This replaces ~45 scattered rules whose per-variant and per-breakpoint heights
+   (198, 224, 200 and 198px for the four states) were what made the guides jump. */
+:root{--stage-size:230px;--media-stage:#0f1611;--media-edge:#2a352d;--media-text:#a9b6ab;--media-pill-bg:rgba(10,15,12,.82);--media-pill-fg:#eef3ee;--media-pill-edge:rgba(255,255,255,.16)}
+:root[data-theme="light"]{--media-stage:#edf1e9;--media-edge:#c9d3c4;--media-text:#47554b}
+.movement-guide-inline{--stage-size:150px}
+.movement-scene{display:flex;justify-content:center}
+.movement-stage{position:relative;flex:none;width:min(100%,var(--stage-size));aspect-ratio:1/1;overflow:hidden;border:1px solid var(--media-edge);border-radius:14px;background:var(--media-stage)}
+.movement-stage>video,.movement-stage>.stage-image,.movement-stage>.motion-frame{position:absolute;inset:0;display:block;width:100%;height:100%;object-fit:contain}
+.stage-message{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:16px;color:var(--media-text);font-size:10px;line-height:1.5;text-align:center}
+.motion-frame{animation:motion-pose-start 2.4s ease-in-out infinite}
+.motion-state,.stage-label{position:absolute;left:8px;bottom:8px;padding:4px 7px;border:1px solid var(--media-pill-edge);border-radius:6px;background:var(--media-pill-bg);color:var(--media-pill-fg);font:500 8px 'DM Mono',monospace;letter-spacing:.7px}
+.motion-state{animation:motion-pose-start 2.4s ease-in-out infinite}
+/* These must come AFTER the .motion-frame / .motion-state rules above: those use the
+   `animation` shorthand, which resets animation-name, and an earlier -peak override of
+   equal specificity would be silently lost (both frames would then fade in step). */
+.motion-frame-peak{animation-name:motion-pose-peak}
+.motion-state-peak{animation-name:motion-pose-peak}
+.motion-toggle{position:absolute;right:8px;bottom:8px;z-index:2;min-width:49px;height:24px;padding:0 8px;border:1px solid var(--media-pill-edge);border-radius:7px;background:var(--media-pill-bg);color:var(--media-pill-fg);font-size:9px;font-weight:600}
+.motion-toggle:hover{background:rgba(10,15,12,.96)}
+.motion-cycle-track{position:absolute;left:0;right:0;bottom:0;height:3px;margin:0;overflow:hidden;background:var(--media-pill-edge)}
+.movement-guide-inline .motion-state,.movement-guide-inline .stage-label{left:6px;bottom:6px;padding:3px 6px;font-size:7px}
+.movement-guide-inline .motion-toggle{right:6px;bottom:6px;min-width:40px;height:21px;padding:0 6px;font-size:8px}
+.demo-badge[hidden]{display:none}
+@media(max-width:760px){.movement-guide-inline{--stage-size:min(100%,200px)}}

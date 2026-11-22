@@ -46,7 +46,8 @@ Anyone can see the source code in a public repository. Your personal training da
 
 - 52 built-in exercises available offline, 49 of which have bundled illustrated guides, plus a searchable illustrated RepDB strength catalog when online
 - Build editable 2-, 3-, or 4-day routine templates by goal, experience, and equipment
-- Active-workout cards autoplay matching Vital Animations MP4 demos with form cues. Settings lets you choose the demo character; the supplied female clips cover Hack Squat, V-Up, and Smith Machine Bent-Over Row. Other movements use the available illustrated guide until matching female footage is added.
+- Every exercise preview uses one square frame, one Play/Pause control and one pair of labels (`VIDEO` / `ILLUSTRATION`), so a workout list looks uniform and a guide never jumps as it loads. Video clips autoplay unless you prefer reduced motion, in which case they start paused. The wording under a preview always describes what is actually shown, including when a female demonstration is not available and the male one or an illustration is used instead.
+- Active-workout cards play matching Vital Animations MP4 demos with form cues. Settings lets you choose the demo character; the supplied female clips cover Hack Squat, V-Up, and Smith Machine Bent-Over Row. Other movements use the available illustrated guide until matching female footage is added.
 - Editable routines and custom exercises, including saving an active workout as a reusable routine
 - Edit saved sessions, log timed holds in seconds, and set a weekly session target
 - Persistent workout logging with warm-up and working sets, reps or hold time, load, RPE, notes, previous-session reference, and rest timer
