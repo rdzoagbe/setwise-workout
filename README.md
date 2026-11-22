@@ -6,6 +6,10 @@ Setwise is a free personal strength-training app: plan routines, log sets as you
 
 https://rdzoagbe.github.io/setwise-workout/
 
+The root URL is a landing page (`index.html`); the app itself is `app.html`. A visitor who already has Setwise data in their browser is forwarded straight into the app, so returning users and installed copies never see the landing page. Add `?landing=1` to view it anyway (Settings → About Setwise links there).
+
+The first time someone opens the app with no saved data, a short setup asks for an optional name, units, experience level (Beginner / Intermediate / Advanced), goal, equipment and training days, then builds a starting plan. The profile is stored only in the browser, like everything else. Anyone with existing data never sees this setup.
+
 ## Run it
 
 **First, build the exercise guides once:**
@@ -22,7 +26,7 @@ Then serve the folder over HTTP — service workers and PWA installation need `h
 python3 -m http.server 8777
 ```
 
-Open `phone-preview.html` to see the live app inside an approximate Galaxy-sized phone frame; the frame is illustrative, not an official Samsung hardware measurement. The preview loads the real app (`index.html?demo=1`) rather than a snapshot, so it can never drift from the app, and `?demo=1` keeps it on a separate storage key so previewing never touches your real training history. For phone installation, host the folder at an HTTPS address such as GitHub Pages, then open that link in Chrome or Samsung Internet and choose **Install app** or **Add to Home screen**. iPhone and iPad users can use Safari Share → **Add to Home Screen**. A downloaded `file://` copy is only a preview: browsers require HTTPS (or localhost) for service workers and PWA installation.
+Open `phone-preview.html` to see the live app inside an approximate Galaxy-sized phone frame; the frame is illustrative, not an official Samsung hardware measurement. The preview loads the real app (`app.html?demo=1`) rather than a snapshot, so it can never drift from the app, and `?demo=1` keeps it on a separate storage key so previewing never touches your real training history. For phone installation, host the folder at an HTTPS address such as GitHub Pages, then open that link in Chrome or Samsung Internet and choose **Install app** or **Add to Home screen**. iPhone and iPad users can use Safari Share → **Add to Home Screen**. A downloaded `file://` copy is only a preview: browsers require HTTPS (or localhost) for service workers and PWA installation.
 
 ## Install on a phone
 

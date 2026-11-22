@@ -88,9 +88,9 @@ jobs:
           mv bundled-guides.js /tmp/guides.js
           node -e '
             const fs = require("node:fs");
-            const html = fs.readFileSync("index.html", "utf8");
+            const html = fs.readFileSync("app.html", "utf8");
             if (!html.includes("bundled-guides.js")) {
-              console.error("::error::index.html no longer references bundled-guides.js");
+              console.error("::error::app.html no longer references bundled-guides.js");
               process.exit(1);
             }
             const guide = fs.readFileSync("exercise-guide.js", "utf8");

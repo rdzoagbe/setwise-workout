@@ -6,59 +6,113 @@
   <meta name="theme-color" content="#0e1310" media="(prefers-color-scheme: dark)">
   <meta name="theme-color" content="#eff1ed" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#0e1310">
-  <meta name="description" content="A private, no-subscription strength training log. Plan sessions, track your lifts, and see your progress.">
-  <title>Setwise — your training log</title>
+  <meta name="description" content="Setwise is a free strength training log that runs in your browser and installs on your phone. Plan routines, log sets, track progress. No account, and your training data never leaves your device.">
+  <title>Setwise — a free, private strength training log</title>
   <link rel="icon" href="./icon.svg" type="image/svg+xml">
   <link rel="manifest" href="./manifest.webmanifest">
-  <script>/* Apply the saved theme before first paint so a light-theme user does not
-     see a dark flash. Mirrors applyTheme() in app.js; dark is the default. */
-    try{var k=/[?&]demo=1(&|$)/.test(location.search)?"setwise-demo-v1":"setwise-personal-v1";
-      var d=JSON.parse(localStorage.getItem(k)||"{}");
-      document.documentElement.setAttribute("data-theme",(d.preferences&&d.preferences.theme)==="light"?"light":"dark");
+  <script>/* Returning users skip the landing page. Runs before first paint, so there is no flash.
+     Anyone with stored Setwise data (including installed apps still launching the old
+     start URL "./") goes straight into the app, keeping any #view in the URL.
+     ?landing=1 shows this page anyway, e.g. from "About Setwise" in the app's settings. */
+    try{
+      var d=localStorage.getItem("setwise-personal-v1");
+      if(d!==null&&!/[?&]landing=1(&|$)/.test(location.search)){location.replace("./app.html"+location.hash);}
+      var p=JSON.parse(d||"{}");
+      document.documentElement.setAttribute("data-theme",(p.preferences&&p.preferences.theme)==="light"?"light":"dark");
     }catch(e){document.documentElement.setAttribute("data-theme","dark");}</script>
   <link rel="stylesheet" href="./styles.css">
+  <link rel="stylesheet" href="./landing.css">
 </head>
-<body>
-  <div class="app-shell">
-    <aside class="sidebar" aria-label="Main navigation">
-      <a class="brand" href="#overview" aria-label="Setwise home">
-        <span class="brand-mark"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M7 10h3v12H7zM22 10h3v12h-3zM10 14h12v4H10zM4 12h3v8H4zM25 12h3v8h-3z" fill="currentColor"/></svg></span>
-        <span class="brand-copy"><strong>setwise</strong><small>YOUR TRAINING LOG</small></span>
-      </a>
-      <div class="sidebar-label">WORKSPACE</div>
-      <nav class="primary-nav">
-        <button class="nav-link active" data-view="overview"><span class="nav-icon" data-icon="overview"></span><span>Overview</span></button>
-        <button class="nav-link" data-view="train"><span class="nav-icon" data-icon="train"></span><span>Train</span><span class="nav-pulse" id="active-pulse"></span></button>
-        <button class="nav-link" data-view="routines"><span class="nav-icon" data-icon="routines"></span><span>Routines</span></button>
-        <button class="nav-link" data-view="exercises"><span class="nav-icon" data-icon="exercises"></span><span>Exercises</span><span class="nav-count" id="exercise-count">0</span></button>
-        <button class="nav-link" data-view="progress"><span class="nav-icon" data-icon="progress"></span><span>Progress</span></button>
-        <button class="nav-link" data-view="body"><span class="nav-icon" data-icon="body"></span><span>Body metrics</span></button>
-        <button class="nav-link" data-view="tools"><span class="nav-icon" data-icon="tools"></span><span>Calculators</span></button>
-      </nav>
-      <div class="sidebar-bottom">
-        <div class="privacy-card"><span class="privacy-icon" data-icon="shield"></span><div><strong>Your data stays yours</strong><small>Saved privately on this device</small></div></div>
-        <button class="nav-link settings-link" data-view="settings"><span class="nav-icon" data-icon="settings"></span><span>Settings & backup</span></button>
-        <div class="profile-row"><div class="avatar">S</div><div class="profile-copy"><strong>My training</strong><small id="profile-units">Metric · kg</small></div><button class="icon-button profile-settings" data-view="settings" aria-label="Settings" title="Settings"><span data-icon="more"></span></button></div>
-      </div>
-    </aside>
+<body class="landing">
+  <header class="lp-header">
+    <a class="lp-brand" href="./" aria-label="Setwise home">
+      <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M7 10h3v12H7zM22 10h3v12h-3zM10 14h12v4H10zM4 12h3v8H4zM25 12h3v8h-3z" fill="currentColor"/></svg></span>
+      <strong>setwise</strong>
+    </a>
+    <a class="button button-secondary button-small" href="./app.html">Open the app</a>
+  </header>
 
-    <main class="main-area">
-      <header class="topbar">
-        <div class="mobile-brand"><span class="brand-mark"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M7 10h3v12H7zM22 10h3v12h-3zM10 14h12v4H10zM4 12h3v8H4zM25 12h3v8h-3z" fill="currentColor"/></svg></span><strong>setwise</strong></div>
-        <div class="breadcrumbs"><span class="crumb-root">Workspace</span><span class="crumb-slash">/</span><strong id="page-heading">Overview</strong></div>
-        <div class="top-actions"><span class="save-indicator"><i></i> Saved locally</span><button class="top-action-icon" data-view="settings" aria-label="Settings" title="Settings"><span data-icon="settings"></span></button><button class="button button-primary button-small" data-action="start-empty"><span data-icon="plus"></span> Start workout</button></div>
-      </header>
-      <div class="content-wrap"><div id="app-content" aria-live="polite"></div><footer class="footer"><span>SETWISE · BUILT FOR YOUR NEXT REP</span><span><a href="https://repdb.co" target="_blank" rel="noopener noreferrer">Exercise data by RepDB (repdb.co)</a> <b>·</b> <a href="https://vitalanimations.com/free-pack" target="_blank" rel="noopener noreferrer">Exercise clips by Vital Animations</a> <b>·</b> Private training log <b>·</b> Free to use · Optional support, never a paywall</span></footer></div>
-    </main>
-  </div>
-  <div id="mobile-dock" class="mobile-dock" aria-label="Mobile navigation"></div>
-  <div id="modal-root"></div>
-  <div id="toast-root" class="toast-root" aria-live="polite"></div>
-  <script src="./bundled-guides.js" defer></script>
-  <script src="./exercise-guide.js" defer></script>
-  <script src="./app.js" defer></script>
+  <main>
+    <section class="lp-hero">
+      <div class="lp-hero-copy">
+        <p class="eyebrow"><i class="dot"></i>FREE STRENGTH TRAINING LOG</p>
+        <h1>Plan, log and progress your lifts. Privately.</h1>
+        <p class="lp-lead">Setwise runs in your browser and installs on your phone like an app. No account, no subscription, and your training history never leaves your device.</p>
+        <div class="lp-cta">
+          <a class="button button-primary" href="./app.html">Get started — it's free</a>
+          <a class="button button-secondary" href="#features">See what's inside</a>
+        </div>
+        <p class="lp-note">Answer five quick questions and get a starting plan for your experience, goal, equipment and schedule.</p>
+      </div>
+
+      <!-- Product visual: plain HTML and CSS, deliberately no third-party imagery. -->
+      <div class="lp-mock" aria-hidden="true">
+        <div class="lp-mock-head">
+          <span class="lp-live"><i></i>Live session</span><span class="lp-clock">24:18</span>
+        </div>
+        <div class="lp-mock-card">
+          <div class="lp-mock-title"><strong>Barbell Bench Press</strong><small>Chest · 4 × 6 reps · last time 80 kg</small></div>
+          <div class="lp-mock-row lp-mock-labels"><span>SET</span><span>LOAD</span><span>REPS</span><span>RPE</span><span></span></div>
+          <div class="lp-mock-row is-done"><span>W</span><span>40</span><span>8</span><span>—</span><span class="lp-tick">✓</span></div>
+          <div class="lp-mock-row is-done"><span>01</span><span>82.5</span><span>6</span><span>7</span><span class="lp-tick">✓</span></div>
+          <div class="lp-mock-row is-done"><span>02</span><span>82.5</span><span>6</span><span>8</span><span class="lp-tick">✓</span></div>
+          <div class="lp-mock-row"><span>03</span><span>82.5</span><span>6</span><span>—</span><span class="lp-box"></span></div>
+        </div>
+        <div class="lp-mock-rest"><span>Rest</span><strong>1:42</strong><small>of 2:30</small></div>
+      </div>
+    </section>
+
+    <section class="lp-features" id="features" aria-labelledby="features-title">
+      <h2 id="features-title" class="lp-section-title">Everything a lifting log needs. Nothing you don't.</h2>
+      <div class="lp-grid">
+        <article class="lp-feature">
+          <h3>Log sets in seconds</h3>
+          <p>Warm-up and working sets, load, reps and RPE, a rest timer, and your numbers from last time right beside you.</p>
+        </article>
+        <article class="lp-feature">
+          <h3>See your progress</h3>
+          <p>Weekly volume, estimated one-rep-max trends, personal records, and optional body measurements.</p>
+        </article>
+        <article class="lp-feature">
+          <h3>Know every movement</h3>
+          <p>Form cues and movement previews for the core lifts, plus a searchable exercise library when you're online.</p>
+        </article>
+        <article class="lp-feature">
+          <h3>A plan that fits you</h3>
+          <p>Starting routines built from your experience, goal, equipment and training days. Edit them however you like.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="lp-cost" aria-labelledby="cost-title">
+      <h2 id="cost-title" class="lp-section-title">What it costs</h2>
+      <ul class="lp-cost-list">
+        <li><strong>Free</strong><span>No subscription and no features behind a paywall.</span></li>
+        <li><strong>No account</strong><span>Your profile is stored in this browser, on this device.</span></li>
+        <li><strong>No tracking</strong><span>No analytics, no ads, no third-party scripts.</span></li>
+        <li><strong>Works offline</strong><span>After your first visit it opens and logs without a connection.</span></li>
+      </ul>
+    </section>
+
+    <section class="lp-faq" aria-labelledby="faq-title">
+      <h2 id="faq-title" class="lp-section-title">Questions</h2>
+      <details><summary>Do I need an account?</summary><p>No. Your profile, routines and history are saved in your browser on this device. There is no sign-up, email or password.</p></details>
+      <details><summary>What if I clear my browser data or change phone?</summary><p>Because your data lives only on your device, clearing this site's data deletes it. Use <em>Settings &amp; backup → Export</em> in the app to save a copy, and import it on your new device.</p></details>
+      <details><summary>Does Setwise send my data anywhere?</summary><p>Your training data is never uploaded. When you're online, the app downloads exercise illustrations from the RepDB catalog hosted on GitHub; those requests contain none of your training data, but like any web request they reach GitHub's servers.</p></details>
+      <details><summary>Can I install it on my phone?</summary><p>Yes. In Chrome or Samsung Internet, open the app and choose <em>Install app</em> or <em>Add to Home screen</em>. On iPhone or iPad, use Safari's Share menu and choose <em>Add to Home Screen</em>.</p></details>
+      <details><summary>Is the plan medical advice?</summary><p>No. Setwise suggests starting templates. If you have an injury or a health condition, check with a qualified professional before you start, and stop any movement that causes pain.</p></details>
+    </section>
+
+    <section class="lp-final">
+      <h2>Your next session starts here.</h2>
+      <a class="button button-primary" href="./app.html">Get started — it's free</a>
+    </section>
+  </main>
+
+  <footer class="lp-footer">
+    <p>Setwise is a training log, not medical advice. Train within your limits.</p>
+    <p><a href="https://repdb.co" rel="nofollow">Exercise data by RepDB (repdb.co)</a> · Exercise clips by Vital Animations · Fonts: DM Sans, DM Mono and Manrope (SIL Open Font License)</p>
+    <p>Setwise is an independent project and is not affiliated with Lyfta or any other fitness service.</p>
+  </footer>
 </body>
 </html>
-
-
-

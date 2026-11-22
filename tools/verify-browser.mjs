@@ -16,6 +16,14 @@ const ok = (name, pass, detail = '') => {
   console.log(`  ${pass ? 'PASS' : 'FAIL'}  ${name}${detail ? ' — ' + detail : ''}`);
 };
 
+// A fresh browser context is a genuine first run, so the app opens with onboarding.
+// Checks that are about the app itself dismiss it through the real "Skip for now"
+// button rather than a test-only flag.
+async function skipOnboarding(page) {
+  const skip = await page.$('[data-ob="skip"]');
+  if (skip) { await skip.click(); await page.waitForTimeout(100); }
+}
+
 const browser = await chromium.launch();
 
 // ---------- 1. App boots clean, no console errors ----------
@@ -25,7 +33,8 @@ const browser = await chromium.launch();
   const errors = [];
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
   page.on('pageerror', e => errors.push(String(e)));
-  await page.goto(BASE + '/index.html', { waitUntil: 'networkidle' });
+  await page.goto(BASE + '/app.html', { waitUntil: 'networkidle' });
+  await skipOnboarding(page);
   ok('app boots with no console errors', errors.length === 0, errors.slice(0, 3).join(' | '));
 
   const guides = await page.evaluate(() => {
@@ -51,7 +60,8 @@ const browser = await chromium.launch();
   const page = await ctx.newPage();
   const imgRequests = [];
   page.on('response', r => { if (r.url().includes('/assets/guides/')) imgRequests.push([r.url().split('/').pop(), r.status()]); });
-  await page.goto(BASE + '/index.html', { waitUntil: 'networkidle' });
+  await page.goto(BASE + '/app.html', { waitUntil: 'networkidle' });
+  await skipOnboarding(page);
   await page.evaluate(() => { const a = document.querySelector('[data-view="exercises"]'); if (a) a.click(); });
   await page.waitForTimeout(900);
   // open the first exercise to force a guide render
@@ -79,7 +89,8 @@ for (const [label, payload] of [
 ]) {
   const ctx = await browser.newContext();
   const page = await ctx.newPage();
-  await page.goto(BASE + '/index.html');
+  await page.goto(BASE + '/app.html');
+  await skipOnboarding(page);
   await page.evaluate(p => localStorage.setItem('setwise-personal-v1', p), payload);
   await page.reload({ waitUntil: 'networkidle' });
   await page.waitForTimeout(600);
@@ -97,7 +108,8 @@ for (const [label, payload] of [
 {
   const ctx = await browser.newContext();
   const page = await ctx.newPage();
-  await page.goto(BASE + '/index.html');
+  await page.goto(BASE + '/app.html');
+  await skipOnboarding(page);
   const v1 = JSON.stringify({
     version: 1,
     routines: [], measurements: [], customExercises: [], activeWorkout: null,
@@ -123,10 +135,12 @@ for (const [label, payload] of [
 {
   const ctx = await browser.newContext();
   const page = await ctx.newPage();
-  await page.goto(BASE + '/index.html');
+  await page.goto(BASE + '/app.html');
+  await skipOnboarding(page);
   await page.evaluate(() => localStorage.setItem('setwise-personal-v1',
     JSON.stringify({ version: 1, workouts: [{ id: 'real', name: 'REAL DATA' }], routines: [], measurements: [], customExercises: [], preferences: {} })));
-  await page.goto(BASE + '/index.html?demo=1', { waitUntil: 'networkidle' });
+  await page.goto(BASE + '/app.html?demo=1', { waitUntil: 'networkidle' });
+  await skipOnboarding(page);
   await page.waitForTimeout(600);
   const st = await page.evaluate(() => ({
     real: JSON.parse(localStorage.getItem('setwise-personal-v1')).workouts.length,
@@ -155,7 +169,7 @@ for (const [label, payload] of [
     hasApp: !!document.querySelector('#app-content, main'),
     key: !!localStorage.getItem('setwise-demo-v1'),
   })) : null;
-  ok('preview uses src, not a 3.8MB srcdoc snapshot', st.src === './index.html?demo=1' && !st.hasSrcdoc, JSON.stringify(st));
+  ok('preview uses src, not a 3.8MB srcdoc snapshot', st.src === './app.html?demo=1' && !st.hasSrcdoc, JSON.stringify(st));
   ok('preview renders the real app in demo mode', inner && inner.hasApp, JSON.stringify(inner));
   await ctx.close();
 }
@@ -164,7 +178,8 @@ for (const [label, payload] of [
 {
   const ctx = await browser.newContext();
   const page = await ctx.newPage();
-  await page.goto(BASE + '/index.html', { waitUntil: 'networkidle' });
+  await page.goto(BASE + '/app.html', { waitUntil: 'networkidle' });
+  await skipOnboarding(page);
   const res = await page.evaluate(() => {
     const B = window.SetwiseBundledGuides;
     return ['plank', 'farmer carry'].map(k => {
@@ -188,13 +203,18 @@ for (const [label, payload] of [
     if (u.endsWith('.woff2')) woff.push([u.split('/').pop(), r.status(), new URL(u).origin]);
     if (!u.startsWith(BASE) && !u.startsWith('data:')) thirdParty.push(u);
   });
-  await page.goto(BASE + '/index.html', { waitUntil: 'networkidle' });
+  await page.goto(BASE + '/app.html', { waitUntil: 'networkidle' });
+  await skipOnboarding(page);
   await page.waitForTimeout(600);
+  // document.fonts.check() is NOT usable here: it returns true when no @font-face
+  // matches at all, which is exactly the failure it should catch (it passed for weeks
+  // while no @font-face rule existed). fonts.load() resolves to the faces it actually
+  // loaded, so an empty array means the family is not defined.
   const fonts = await page.evaluate(async () => {
-    await document.fonts.ready;
-    return { manrope: document.fonts.check('700 20px Manrope'),
-             sans: document.fonts.check('400 14px "DM Sans"'),
-             mono: document.fonts.check('500 10px "DM Mono"') };
+    const got = async (spec) => (await document.fonts.load(spec)).some((f) => f.status === 'loaded');
+    return { manrope: await got('700 20px Manrope'),
+             sans: await got('400 14px "DM Sans"'),
+             mono: await got('500 10px "DM Mono"') };
   });
   // Fonts may be served from the service worker cache rather than the network, and
   // unicode-range means a weight whose glyphs are unused is never fetched. So assert
@@ -223,7 +243,8 @@ for (const [label, payload] of [
 {
   const ctx = await browser.newContext();
   const page = await ctx.newPage();
-  await page.goto(BASE + '/index.html', { waitUntil: 'networkidle' });
+  await page.goto(BASE + '/app.html', { waitUntil: 'networkidle' });
+  await skipOnboarding(page);
   const def = await page.evaluate(() => document.documentElement.getAttribute('data-theme'));
   ok('dark is the default theme', def === 'dark', `got ${def}`);
 
@@ -250,7 +271,8 @@ for (const [label, payload] of [
 {
   const ctx = await browser.newContext();
   const page = await ctx.newPage();
-  await page.goto(BASE + '/index.html', { waitUntil: 'networkidle' });
+  await page.goto(BASE + '/app.html', { waitUntil: 'networkidle' });
+  await skipOnboarding(page);
   const res = await page.evaluate(() => {
     const css = [...document.styleSheets].flatMap(s => { try { return [...s.cssRules].map(r => r.cssText); } catch { return []; } }).join('');
     const defined = new Set([...css.matchAll(/(--[a-z0-9-]+)\s*:/g)].map(m => m[1]));
@@ -273,7 +295,8 @@ for (const [label, payload] of [
 {
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 1000 } });
   const page = await ctx.newPage();
-  await page.goto(BASE + '/index.html', { waitUntil: 'networkidle' });
+  await page.goto(BASE + '/app.html', { waitUntil: 'networkidle' });
+  await skipOnboarding(page);
   const VIEWS = ['overview', 'train', 'routines', 'exercises', 'progress', 'body', 'tools', 'settings'];
   for (const theme of ['dark', 'light']) {
     await page.evaluate(t => document.documentElement.setAttribute('data-theme', t), theme);
@@ -313,7 +336,8 @@ for (const [label, payload] of [
 {
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   const page = await ctx.newPage();
-  await page.goto(BASE + '/index.html', { waitUntil: 'networkidle' });
+  await page.goto(BASE + '/app.html', { waitUntil: 'networkidle' });
+  await skipOnboarding(page);
   await page.waitForTimeout(1500);
 
   const probe = async (id) => {
@@ -385,7 +409,8 @@ for (const [label, payload] of [
 // ---------- 13. Video control: one Play/Pause, honours reduced motion ----------
 {
   const open = async (page) => {
-    await page.goto(BASE + '/index.html', { waitUntil: 'networkidle' });
+    await page.goto(BASE + '/app.html', { waitUntil: 'networkidle' });
+    await skipOnboarding(page);
     await page.waitForTimeout(1200);
     await page.evaluate(() => document.querySelector('[data-view="exercises"]').click());
     await page.waitForTimeout(200);
@@ -458,7 +483,8 @@ for (const [label, payload] of [
 {
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   const page = await ctx.newPage();
-  await page.goto(BASE + '/index.html', { waitUntil: 'networkidle' });
+  await page.goto(BASE + '/app.html', { waitUntil: 'networkidle' });
+  await skipOnboarding(page);
   await page.waitForTimeout(1200);
   await page.evaluate(() => document.querySelector('[data-view="settings"]').click());
   await page.waitForTimeout(300);
@@ -509,7 +535,8 @@ for (const [label, payload] of [
     await new Promise((r) => setTimeout(r, 1800));
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ exercises: [] }) });
   });
-  await page.goto(BASE + '/index.html', { waitUntil: 'domcontentloaded' });
+  await page.goto(BASE + '/app.html', { waitUntil: 'domcontentloaded' });
+  await skipOnboarding(page);
   await page.waitForTimeout(700);
   await page.evaluate(() => document.querySelector('[data-view="exercises"]').click());
   await page.waitForTimeout(200);
@@ -533,7 +560,8 @@ for (const [label, payload] of [
   const fctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   const fpage = await fctx.newPage();
   await fpage.route('**/assets/vital-free/0051.mp4', (route) => route.abort());
-  await fpage.goto(BASE + '/index.html', { waitUntil: 'networkidle' });
+  await fpage.goto(BASE + '/app.html', { waitUntil: 'networkidle' });
+  await skipOnboarding(fpage);
   await fpage.waitForTimeout(1200);
   await fpage.evaluate(() => document.querySelector('[data-view="exercises"]').click());
   await fpage.waitForTimeout(200);
@@ -550,6 +578,274 @@ for (const [label, payload] of [
      failed.kind !== 'video' && !failed.hasVideo && failed.badge !== 'VIDEO' && !/(Male|Female) demonstration/.test(failed.disclaimer),
      JSON.stringify(failed));
   await fctx.close();
+}
+
+// ---------- 16. Landing page ----------
+// WCAG AA check reused below for the landing page and each onboarding step.
+const contrastFailures = (page) => page.evaluate(() => {
+  const lum = (c) => { const [r, g, b] = c.match(/[\d.]+/g).slice(0, 3).map(Number)
+    .map((v) => { v /= 255; return v <= .03928 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4; });
+    return .2126 * r + .7152 * g + .0722 * b; };
+  // Composite every background from the root down on a 1x1 canvas, so translucent
+  // layers (e.g. a color-mix() tint, which Chrome reports as `color(srgb ... / 0.12)`)
+  // are measured as the colour actually on screen rather than misparsed.
+  const px = document.createElement('canvas').getContext('2d', { willReadFrequently: true });
+  const bgOf = (el) => {
+    const layers = [];
+    for (let e = el; e; e = e.parentElement) {
+      const c = getComputedStyle(e).backgroundColor;
+      if (c && c !== 'rgba(0, 0, 0, 0)' && c !== 'transparent') layers.push(c);
+    }
+    px.fillStyle = '#ffffff'; px.fillRect(0, 0, 1, 1);
+    for (let i = layers.length - 1; i >= 0; i--) { px.fillStyle = layers[i]; px.fillRect(0, 0, 1, 1); }
+    const [r, g, b] = px.getImageData(0, 0, 1, 1).data;
+    return `rgb(${r}, ${g}, ${b})`;
+  };
+  const out = [];
+  for (const el of document.querySelectorAll('h1,h2,h3,h4,p,span,small,strong,button,a,label,li,summary,em')) {
+    const t = (el.textContent || '').trim();
+    if (!t || el.children.length) continue;
+    const cs = getComputedStyle(el);
+    if (cs.display === 'none' || cs.visibility === 'hidden' || !el.getClientRects().length) continue;
+    if (el.closest('[inert]')) continue;                  // hidden behind a modal overlay
+    if (!cs.color.startsWith('rgb')) continue;
+    const L1 = lum(cs.color), L2 = lum(bgOf(el));
+    const ratio = (Math.max(L1, L2) + .05) / (Math.min(L1, L2) + .05);
+    const size = parseFloat(cs.fontSize), weight = parseInt(cs.fontWeight) || 400;
+    const need = (size >= 24 || (size >= 18.66 && weight >= 700)) ? 3 : 4.5;
+    if (ratio < need) out.push(`"${t.slice(0, 24)}" ${ratio.toFixed(2)}<${need}`);
+  }
+  return out;
+});
+
+{
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const page = await ctx.newPage();
+  const offOrigin = [];
+  page.on('request', (r) => { if (!r.url().startsWith(BASE) && !r.url().startsWith('data:')) offOrigin.push(r.url()); });
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' });
+  const landing = await page.evaluate(() => ({
+    isLanding: document.body.classList.contains('landing'),
+    ctas: [...document.querySelectorAll('a.button-primary')].map((a) => a.getAttribute('href')),
+    scripts: [...document.scripts].filter((s) => s.src).length,
+  }));
+  ok('a new visitor at / sees the landing page', landing.isLanding && page.url() === BASE + '/', page.url());
+  ok('the landing page makes zero off-origin requests', offOrigin.length === 0, offOrigin.slice(0, 3).join(' ') || 'none');
+  ok('the landing page loads no external script files at all', landing.scripts === 0, `${landing.scripts} script src`);
+  ok('every primary call to action opens the app', landing.ctas.length >= 2 && landing.ctas.every((h) => h === './app.html'), landing.ctas.join(' '));
+  for (const theme of ['dark', 'light']) {
+    await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme);
+    await page.evaluate(() => document.querySelectorAll('details').forEach((d) => { d.open = true; }));
+    await page.waitForTimeout(350);   // let the .18s colour transitions finish
+    const fails = await contrastFailures(page);
+    ok(`landing page passes WCAG AA in the ${theme} theme`, fails.length === 0, fails.slice(0, 3).join(' | ') || 'all text passes');
+  }
+  await ctx.close();
+}
+
+// ---------- 17. Returning users skip the landing page ----------
+{
+  const ctx = await browser.newContext();
+  const seed = await ctx.newPage();
+  await seed.goto(BASE + '/?landing=1', { waitUntil: 'networkidle' });
+  await seed.evaluate(() => localStorage.setItem('setwise-personal-v1', JSON.stringify({
+    version: 1, preferences: {}, routines: [], workouts: [], measurements: [], customExercises: [] })));
+  await seed.close();
+  // A fresh page each time: a hash-only change on an open page is same-document
+  // navigation, which never re-runs the forwarding script and would fake a failure.
+  const visit = async (path) => {
+    const p = await ctx.newPage();
+    await p.goto(BASE + path, { waitUntil: 'networkidle' });
+    const url = p.url().replace(BASE, '');
+    await p.close();
+    return url;
+  };
+  const root = await visit('/');
+  const hash = await visit('/#progress');
+  const bypass = await visit('/?landing=1');
+  ok('a returning user at / goes straight to the app', root === '/app.html', root);
+  ok('the forward keeps the #view from the URL', hash === '/app.html#progress', hash);
+  ok('?landing=1 shows the landing page even with stored data', bypass === '/?landing=1', bypass);
+  await ctx.close();
+}
+
+// ---------- 18. First-run onboarding ----------
+{
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const page = await ctx.newPage();
+  await page.goto(BASE + '/app.html', { waitUntil: 'networkidle' });
+  const first = await page.evaluate(() => ({
+    shown: !!document.querySelector('.onboarding[role="dialog"]'),
+    appInert: document.querySelector('.app-shell').inert,
+  }));
+  ok('a genuine first run of the app shows onboarding', first.shown, JSON.stringify(first));
+  ok('the app behind onboarding is inert (no tabbing into it)', first.appInert === true);
+
+  // Every step must be readable in both themes.
+  const stepFails = [];
+  for (let step = 0; step < 5; step++) {
+    for (const theme of ['dark', 'light']) {
+      await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme);
+      await page.waitForTimeout(350);   // let the .18s colour transitions finish
+      (await contrastFailures(page)).forEach((f) => stepFails.push(`step ${step + 1} ${theme}: ${f}`));
+    }
+    if (step === 0) { await page.fill('#ob-name', 'Alex'); await page.click('[data-ob-set="unit"][data-value="lb"]'); }
+    if (step === 1) await page.click('[data-ob-set="experience"][data-value="advanced"]');
+    if (step === 2) await page.click('[data-ob-set="goal"][data-value="strength"]');
+    if (step === 3) await page.click('[data-ob-set="equipment"][data-value="gym"]');
+    if (step === 4) await page.click('[data-ob-set="days"][data-value="4"]');
+    await page.click(step < 4 ? '[data-ob="next"]' : '[data-ob="finish"]');
+    await page.waitForTimeout(120);
+  }
+  ok('every onboarding step passes WCAG AA in both themes', stepFails.length === 0, stepFails.slice(0, 3).join(' | ') || 'all text passes');
+  await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'));
+
+  const done = await page.evaluate(() => {
+    const d = JSON.parse(localStorage.getItem('setwise-personal-v1'));
+    return {
+      prefs: d.preferences, overlay: !!document.querySelector('.onboarding'),
+      inert: document.querySelector('.app-shell').inert,
+      routines: d.routines.map((r) => ({ name: r.name, sets: r.exercises.map((x) => x.sets) })),
+      sidebar: document.querySelector('#profile-name').textContent,
+    };
+  });
+  const p = done.prefs;
+  ok('finishing onboarding stores every answer',
+     p.userName === 'Alex' && p.unit === 'lb' && p.experience === 'advanced' && p.goal === 'strength'
+       && p.equipment === 'gym' && p.weeklyTarget === 4 && !!p.onboardedAt && !p.onboardingSkipped,
+     JSON.stringify({ userName: p.userName, unit: p.unit, experience: p.experience, goal: p.goal, equipment: p.equipment, weeklyTarget: p.weeklyTarget }));
+  ok('it replaces the sample routines with a plan matching the answers',
+     done.routines.length === 4 && done.routines.every((r) => r.name.startsWith('Strength ·')),
+     done.routines.map((r) => r.name).join(', '));
+  // Advanced + strength: 5 sets on main lifts, 3 on accessories.
+  const setCounts = [...new Set(done.routines.flatMap((r) => r.sets))].sort();
+  ok('Advanced strength plans use 5 sets on main lifts and 3 on accessories', JSON.stringify(setCounts) === '[3,5]', JSON.stringify(setCounts));
+  ok('the overlay closes and the app becomes usable again', !done.overlay && done.inert === false);
+  ok('the profile name appears in the app', done.sidebar === 'Alex', done.sidebar);
+  await page.reload({ waitUntil: 'networkidle' });
+  ok('onboarding does not come back after a reload', !(await page.$('.onboarding')));
+  await ctx.close();
+}
+
+{
+  // Skip keeps the sample routines and never shows onboarding again.
+  const ctx = await browser.newContext();
+  const page = await ctx.newPage();
+  await page.goto(BASE + '/app.html', { waitUntil: 'networkidle' });
+  await page.click('[data-ob="skip"]');
+  await page.waitForTimeout(150);
+  const skipped = await page.evaluate(() => {
+    const d = JSON.parse(localStorage.getItem('setwise-personal-v1'));
+    return { onboardedAt: !!d.preferences.onboardedAt, skipped: d.preferences.onboardingSkipped, routines: d.routines.length };
+  });
+  ok('Skip saves the profile and keeps the sample routines',
+     skipped.onboardedAt && skipped.skipped === true && skipped.routines === 3, JSON.stringify(skipped));
+  await page.reload({ waitUntil: 'networkidle' });
+  ok('a skipped onboarding does not reappear', !(await page.$('.onboarding')));
+  await ctx.close();
+}
+
+{
+  // The guard that matters most: people who already use Setwise have data but no
+  // onboardedAt (it did not exist before). They must never be pushed through setup.
+  const ctx = await browser.newContext();
+  const page = await ctx.newPage();
+  await page.goto(BASE + '/?landing=1');
+  await page.evaluate(() => localStorage.setItem('setwise-personal-v1', JSON.stringify({
+    version: 1, preferences: { unit: 'kg' }, routines: [], measurements: [], customExercises: [],
+    workouts: [{ id: 'w1', name: 'Old session', date: '2026-10-01', exercises: [] }] })));
+  await page.goto(BASE + '/app.html', { waitUntil: 'networkidle' });
+  const existing = await page.evaluate(() => ({
+    overlay: !!document.querySelector('.onboarding'),
+    workouts: JSON.parse(localStorage.getItem('setwise-personal-v1')).workouts.length,
+  }));
+  ok('an existing user without onboardedAt never sees onboarding', !existing.overlay && existing.workouts === 1, JSON.stringify(existing));
+  await ctx.close();
+}
+
+// ---------- 19. Install, offline and the experience tiers ----------
+{
+  const ctx = await browser.newContext();
+  const page = await ctx.newPage();
+  const manifest = await (await page.request.get(BASE + '/manifest.webmanifest')).json();
+  ok('the manifest launches the app and keeps the installed identity',
+     manifest.start_url === './app.html' && manifest.id === './', JSON.stringify({ start_url: manifest.start_url, id: manifest.id }));
+
+  // Offline: once the service worker is installed, the app still opens, and so does an
+  // older install that launches "./" (landing page forwards from cache).
+  await page.goto(BASE + '/app.html', { waitUntil: 'networkidle' });
+  await skipOnboarding(page);
+  await page.evaluate(() => navigator.serviceWorker.ready);
+  await page.reload({ waitUntil: 'networkidle' });      // let the worker control the page
+  await page.waitForTimeout(400);
+  await ctx.setOffline(true);
+  const offlineApp = await ctx.newPage();
+  await offlineApp.goto(BASE + '/app.html', { waitUntil: 'domcontentloaded' });
+  await offlineApp.waitForTimeout(800);
+  const appOk = await offlineApp.evaluate(() => (document.querySelector('#app-content') || {}).textContent?.length > 50);
+  const oldStart = await ctx.newPage();
+  await oldStart.goto(BASE + '/', { waitUntil: 'domcontentloaded' });
+  await oldStart.waitForTimeout(800);
+  ok('offline, the installed app still opens', appOk === true);
+  ok('offline, an old "./" launch still reaches the app', oldStart.url().endsWith('/app.html'), oldStart.url().replace(BASE, ''));
+  await ctx.setOffline(false);
+  await ctx.close();
+}
+
+{
+  // The modal generator offers all three tiers, and Advanced adds a set on main lifts.
+  const ctx = await browser.newContext();
+  const page = await ctx.newPage();
+  await page.goto(BASE + '/app.html', { waitUntil: 'networkidle' });
+  await skipOnboarding(page);
+  const build = async (experience) => {
+    await page.evaluate(() => {
+      const d = JSON.parse(localStorage.getItem('setwise-personal-v1')); d.routines = [];
+      localStorage.setItem('setwise-personal-v1', JSON.stringify(d));
+    });
+    await page.reload({ waitUntil: 'networkidle' });
+    await page.evaluate(() => { const b = document.createElement('button'); b.dataset.action = 'build-program'; document.body.appendChild(b); b.click(); });
+    await page.waitForTimeout(120);
+    const opts = await page.evaluate(() => [...document.querySelectorAll('#program-form select[name="experience"] option')].map((o) => o.value + ':' + o.textContent));
+    await page.evaluate((exp) => {
+      const f = document.querySelector('#program-form');
+      f.goal.value = 'muscle'; f.days.value = '3'; f.experience.value = exp; f.equipment.value = 'gym';
+      document.querySelector('[data-action="save-program"]').click();
+    }, experience);
+    await page.waitForTimeout(120);
+    const sets = await page.evaluate(() => JSON.parse(localStorage.getItem('setwise-personal-v1')).routines.flatMap((r) => r.exercises.map((x) => x.sets)));
+    return { opts, sets: [...new Set(sets)].sort() };
+  };
+  const beginner = await build('new'), intermediate = await build('regular'), advanced = await build('advanced');
+  ok('the plan builder offers Beginner, Intermediate and Advanced',
+     JSON.stringify(advanced.opts) === JSON.stringify(['new:Beginner', 'regular:Intermediate', 'advanced:Advanced']), advanced.opts.join(' '));
+  ok('Beginner and Intermediate plans are unchanged by the refactor',
+     JSON.stringify(beginner.sets) === '[2,3]' && JSON.stringify(intermediate.sets) === '[3]',
+     `beginner ${JSON.stringify(beginner.sets)} · intermediate ${JSON.stringify(intermediate.sets)}`);
+  ok('Advanced adds one set on main lifts', JSON.stringify(advanced.sets) === '[3,4]', JSON.stringify(advanced.sets));
+  await ctx.close();
+}
+
+// ---------- 20. Mobile: every section is reachable ----------
+{
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const page = await ctx.newPage();
+  await page.goto(BASE + '/app.html', { waitUntil: 'networkidle' });
+  await skipOnboarding(page);
+  const dock = await page.evaluate(() => [...document.querySelectorAll('#mobile-dock .dock-link span')].map((s) => s.textContent));
+  ok('the mobile dock is Home / Train / Plans / Progress / More',
+     JSON.stringify(dock) === JSON.stringify(['Home', 'Train', 'Plans', 'Progress', 'More']), dock.join(' | '));
+  const reached = [];
+  for (const [view, heading] of [['exercises', 'Exercises'], ['body', 'Body metrics'], ['tools', 'Calculators'], ['settings', 'Settings & backup']]) {
+    await page.click('#mobile-dock [data-action="dock-more"]');
+    await page.click(`.more-sheet [data-view="${view}"]`);
+    await page.waitForTimeout(150);
+    const st = await page.evaluate(() => ({ h: document.querySelector('#page-heading').textContent, open: !!document.querySelector('.more-sheet') }));
+    if (st.h === heading && !st.open) reached.push(view);
+  }
+  ok('More reaches Exercises, Body metrics, Calculators and Settings, and closes after',
+     reached.length === 4, reached.join(', '));
+  await ctx.close();
 }
 
 await browser.close();
