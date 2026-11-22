@@ -309,6 +309,219 @@ for (const [label, payload] of [
   await ctx.close();
 }
 
+// ---------- 12. Movement stage: one presentation for every state ----------
+{
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const page = await ctx.newPage();
+  await page.goto(BASE + '/index.html', { waitUntil: 'networkidle' });
+  await page.waitForTimeout(1500);
+
+  const probe = async (id) => {
+    await page.keyboard.press('Escape');
+    await page.evaluate(() => document.querySelector('[data-view="exercises"]').click());
+    await page.waitForTimeout(200);
+    await page.evaluate((i) => document.querySelector(`[data-action="exercise-info"][data-id="${i}"]`).click(), id);
+    await page.waitForTimeout(600);
+    return page.evaluate(() => {
+      const scene = document.querySelector('[data-movement-scene]');
+      const stage = scene.querySelector('.movement-stage').getBoundingClientRect();
+      const root = document.querySelector('[data-guide-root]');
+      const badge = root.querySelector('.demo-badge');
+      return {
+        kind: scene.dataset.mediaKind, w: Math.round(stage.width), h: Math.round(stage.height),
+        hasVideo: !!scene.querySelector('video'), hasImg: !!scene.querySelector('img'),
+        controls: !!scene.querySelector('video[controls]'),
+        badge: badge.hidden ? '' : badge.textContent,
+        disclaimer: root.querySelector('.demo-disclaimer').textContent,
+      };
+    });
+  };
+
+  const video = await probe('pec-deck');
+  const loop = await probe('barbell-bench-press');
+  const hold = await probe('plank');
+  const empty = await probe('cable-wood-chop');
+
+  // The four states used to be 198 / 224 / 200 / 198px tall.
+  const sizes = [video, loop, hold, empty].map((r) => r.w + 'x' + r.h);
+  ok('video, pose loop, hold and empty states share one stage size',
+     new Set(sizes).size === 1 && video.w === video.h, sizes.join(' | '));
+  ok('the kinds under test are the ones intended',
+     video.kind === 'video' && loop.kind === 'illustration' && hold.kind === 'illustration' && empty.kind === 'empty',
+     [video, loop, hold, empty].map((r) => r.kind).join(' '));
+  ok('no video uses the native browser controls', !video.controls);
+  ok('badges are VIDEO / ILLUSTRATION / none and match the media shown',
+     video.badge === 'VIDEO' && video.hasVideo && loop.badge === 'ILLUSTRATION' && loop.hasImg
+       && hold.badge === 'ILLUSTRATION' && hold.hasImg && empty.badge === '' && !empty.hasVideo && !empty.hasImg,
+     [video, loop, hold, empty].map((r) => r.badge || '(none)').join(' | '));
+  ok('an empty state does not claim to show a position guide',
+     !/position|illustrat|demonstration/i.test(empty.disclaimer), empty.disclaimer);
+
+  // The two pose frames must crossfade, not animate in step. A later `animation`
+  // shorthand once reset the peak frame to the start animation, so both faded
+  // together and the stage went blank; sizes and badges all still looked right.
+  await probe('barbell-bench-press');
+  const fade = await page.evaluate(() => {
+    const at = (ms) => {
+      document.getAnimations().forEach((a) => { a.pause(); a.currentTime = ms; });
+      const op = (sel) => Number(getComputedStyle(document.querySelector(sel)).opacity);
+      return { start: op('.motion-frame-start'), peak: op('.motion-frame-peak'),
+               startLabel: op('.motion-state-start'), peakLabel: op('.motion-state-peak') };
+    };
+    const names = ['.motion-frame-start', '.motion-frame-peak', '.motion-state-start', '.motion-state-peak']
+      .map((s) => getComputedStyle(document.querySelector(s)).animationName);
+    return { names, t0: at(0), t1400: at(1400) };
+  });
+  ok('start and peak frames use different animations',
+     fade.names[0] !== fade.names[1] && fade.names[2] !== fade.names[3], fade.names.join(' / '));
+  ok('start frame is shown at the start of the cycle and peak is not',
+     fade.t0.start === 1 && fade.t0.peak === 0 && fade.t0.startLabel === 1 && fade.t0.peakLabel === 0, JSON.stringify(fade.t0));
+  ok('peak frame replaces the start frame later in the cycle',
+     fade.t1400.start === 0 && fade.t1400.peak === 1 && fade.t1400.startLabel === 0 && fade.t1400.peakLabel === 1,
+     JSON.stringify(fade.t1400));
+  await ctx.close();
+}
+
+// ---------- 13. Video control: one Play/Pause, honours reduced motion ----------
+{
+  const open = async (page) => {
+    await page.goto(BASE + '/index.html', { waitUntil: 'networkidle' });
+    await page.waitForTimeout(1200);
+    await page.evaluate(() => document.querySelector('[data-view="exercises"]').click());
+    await page.waitForTimeout(200);
+    await page.evaluate(() => document.querySelector('[data-action="exercise-info"][data-id="pec-deck"]').click());
+    await page.waitForTimeout(900);
+  };
+  const state = (page) => page.evaluate(() => {
+    const v = document.querySelector('video.vital-animation');
+    const b = document.querySelector('[data-movement-scene] [data-motion-toggle]');
+    return { paused: v.paused, userPaused: v.dataset.userPaused || null, autoplay: v.hasAttribute('autoplay'),
+             pressed: b.getAttribute('aria-pressed'), label: b.textContent, sceneClass: document.querySelector('[data-movement-scene]').classList.contains('is-paused') };
+  });
+
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const page = await ctx.newPage();
+  await open(page);
+  await page.click('[data-movement-scene] [data-motion-toggle]');
+  await page.waitForTimeout(250);
+  const paused = await state(page);
+  ok('pressing Pause stops the video and updates the control',
+     paused.paused && paused.userPaused === 'true' && paused.pressed === 'true' && paused.label === 'Play' && paused.sceneClass, JSON.stringify(paused));
+  await page.click('[data-movement-scene] [data-motion-toggle]');
+  await page.waitForTimeout(500);
+  const resumed = await state(page);
+  ok('pressing Play resumes it and clears the user-paused flag',
+     !resumed.paused && resumed.userPaused === null && resumed.pressed === 'false' && resumed.label === 'Pause', JSON.stringify(resumed));
+  await ctx.close();
+
+  // Stills already honoured prefers-reduced-motion; the video did not.
+  const rctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, reducedMotion: 'reduce' });
+  const rpage = await rctx.newPage();
+  await open(rpage);
+  const reduced = await state(rpage);
+  ok('with reduced motion the video starts paused, not autoplaying',
+     reduced.paused && !reduced.autoplay && reduced.userPaused === 'true' && reduced.label === 'Play' && reduced.sceneClass, JSON.stringify(reduced));
+  await rctx.close();
+}
+
+// ---------- 14. Female mode tells the truth about what is on screen ----------
+{
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const page = await ctx.newPage();
+  await page.goto(BASE + '/index.html', { waitUntil: 'networkidle' });
+  await page.waitForTimeout(1200);
+  await page.evaluate(() => document.querySelector('[data-view="settings"]').click());
+  await page.waitForTimeout(300);
+  await page.evaluate(() => document.querySelector('[data-demo-model="female"]').click());
+  await page.waitForTimeout(300);
+
+  const read = async (id) => {
+    await page.keyboard.press('Escape');
+    await page.evaluate(() => document.querySelector('[data-view="exercises"]').click());
+    await page.waitForTimeout(200);
+    await page.evaluate((i) => document.querySelector(`[data-action="exercise-info"][data-id="${i}"]`).click(), id);
+    await page.waitForTimeout(600);
+    return page.evaluate(() => {
+      const scene = document.querySelector('[data-movement-scene]');
+      const root = document.querySelector('[data-guide-root]');
+      const badge = root.querySelector('.demo-badge');
+      return { kind: scene.dataset.mediaKind, key: scene.dataset.mediaKey, badge: badge.hidden ? '' : badge.textContent,
+               disclaimer: root.querySelector('.demo-disclaimer').textContent };
+    });
+  };
+
+  // Pec Deck has only a MALE clip. It used to say "...The available position guide is
+  // shown below" while that male video was playing.
+  const maleOnly = await read('pec-deck');
+  ok('male-only clip in female mode says the male one is shown',
+     maleOnly.kind === 'video' && /male one is shown/i.test(maleOnly.disclaimer) && !/position guide|illustrated/i.test(maleOnly.disclaimer),
+     maleOnly.disclaimer);
+  const hasFemale = await read('hack-squat');
+  ok('a movement with a female clip says it is a female demonstration',
+     hasFemale.kind === 'video' && /^Female demonstration/.test(hasFemale.disclaimer) && hasFemale.key.includes('video:female'),
+     hasFemale.key + ' / ' + hasFemale.disclaimer.slice(0, 40));
+  const stills = await read('barbell-bench-press');
+  ok('a stills-only movement says the illustrated guide is shown',
+     stills.kind === 'illustration' && /illustrated guide is shown/i.test(stills.disclaimer), stills.disclaimer);
+  ok('the badge describes the media, never "NO FEMALE CLIP"',
+     [maleOnly, hasFemale, stills].every((r) => /^(VIDEO|ILLUSTRATION)$/.test(r.badge)),
+     [maleOnly, hasFemale, stills].map((r) => r.badge).join(' | '));
+  await ctx.close();
+}
+
+// ---------- 15. No layout shift when the catalog loads, and failures update the chrome ----------
+{
+  // Hold the RepDB catalog request open so a guide renders in its loading state, then
+  // release it. Stub the body so the check does not depend on the network.
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const page = await ctx.newPage();
+  await page.route('**/RepDB/exercise-dataset/main/exercises.json', async (route) => {
+    await new Promise((r) => setTimeout(r, 1800));
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ exercises: [] }) });
+  });
+  await page.goto(BASE + '/index.html', { waitUntil: 'domcontentloaded' });
+  await page.waitForTimeout(700);
+  await page.evaluate(() => document.querySelector('[data-view="exercises"]').click());
+  await page.waitForTimeout(200);
+  await page.evaluate(() => document.querySelector('[data-action="exercise-info"][data-id="cable-wood-chop"]').click());
+  await page.waitForTimeout(300);
+  const rect = () => page.evaluate(() => {
+    const scene = document.querySelector('[data-movement-scene]');
+    const r = scene.querySelector('.movement-stage').getBoundingClientRect();
+    const steps = document.querySelector('.form-steps').getBoundingClientRect();
+    return { kind: scene.dataset.mediaKind, h: Math.round(r.height), stepsTop: Math.round(steps.top) };
+  });
+  const before = await rect();
+  await page.waitForTimeout(2200);
+  const after = await rect();
+  ok('the guide hydrates from "loading" to "empty" with nothing below it moving',
+     before.kind === 'loading' && after.kind === 'empty' && before.h === after.h && before.stepsTop === after.stepsTop,
+     JSON.stringify({ before, after }));
+  await ctx.close();
+
+  // A clip that fails to load falls back to stills, and the badge and wording follow it.
+  const fctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const fpage = await fctx.newPage();
+  await fpage.route('**/assets/vital-free/0051.mp4', (route) => route.abort());
+  await fpage.goto(BASE + '/index.html', { waitUntil: 'networkidle' });
+  await fpage.waitForTimeout(1200);
+  await fpage.evaluate(() => document.querySelector('[data-view="exercises"]').click());
+  await fpage.waitForTimeout(200);
+  await fpage.evaluate(() => document.querySelector('[data-action="exercise-info"][data-id="pec-deck"]').click());
+  await fpage.waitForTimeout(1200);
+  const failed = await fpage.evaluate(() => {
+    const scene = document.querySelector('[data-movement-scene]');
+    const root = document.querySelector('[data-guide-root]');
+    const badge = root.querySelector('.demo-badge');
+    return { kind: scene.dataset.mediaKind, hasVideo: !!scene.querySelector('video'), badge: badge.hidden ? '' : badge.textContent,
+             disclaimer: root.querySelector('.demo-disclaimer').textContent };
+  });
+  ok('a clip that fails to load stops claiming to be a video',
+     failed.kind !== 'video' && !failed.hasVideo && failed.badge !== 'VIDEO' && !/(Male|Female) demonstration/.test(failed.disclaimer),
+     JSON.stringify(failed));
+  await fctx.close();
+}
+
 await browser.close();
 
 const failed = results.filter(r => !r.pass);

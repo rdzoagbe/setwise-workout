@@ -160,88 +160,133 @@
     return null;
   }
 
-  function sceneMarkup(ex, record, loading, skipVideo = false) {
-    const clip = selectedClip(ex);
-    if (clip && !skipVideo) {
-      const src = "./assets/vital-" + (clip.model === "female" ? "female/" : "free/") + clip.id + ".mp4";
-      return '<div class="movement-scene movement-scene-video" data-movement-scene><video class="vital-animation" src="' + esc(src) + '" autoplay muted loop playsinline controls preload="metadata" aria-label="Looping ' + esc(clip.model) + ' demonstration of ' + esc(ex.name) + '"></video></div>';
-    }
-    if (loading) {
-      return '<div class="movement-scene movement-scene-loading" data-movement-scene aria-live="polite"><span class="visual-loading-dot"></span><span>Loading movement pictures…</span></div>';
-    }
-    if (!record) {
-      const message = catalogFailed
-        ? "Movement pictures need an internet connection. Your form cues are below."
-        : "No matching movement pictures are available yet. Your form cues are below.";
-      return '<div class="movement-scene movement-scene-empty" data-movement-scene><span class="scene-empty-mark" aria-hidden="true">↗</span><span>' + message + '</span></div>';
-    }
+  const prefersReducedMotion = () => !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+
+  // ONE decision about what a movement shows. The scene, the badge and the disclaimer
+  // are all derived from this, so they cannot disagree about what is on screen. (They
+  // used to be computed independently, which is how the female-mode disclaimer ended
+  // up describing an illustrated guide while a male video was playing.)
+  function mediaFor(ex, record, loading, skipVideo = false) {
+    const clip = skipVideo ? null : selectedClip(ex);
+    if (clip) return { kind: "video", clip };
+    if (loading) return { kind: "loading" };
+    if (!record) return { kind: "empty", reason: catalogFailed ? "offline" : "none" };
     const paths = record.images && record.images.flat || {};
     // Static holds (plank, farmer carry) ship a single `main` image rather than a
-    // start/peak pair. Falling back to it makes start === peak, which the
-    // single-figure "Hold position" branch below already renders correctly.
+    // start/peak pair; falling back to it makes start === peak, which renders as a hold.
     const start = safeImageUrl(paths.start || paths.main), peak = safeImageUrl(paths.peak || paths.main);
-    if (!start && !peak) return '<div class="movement-scene movement-scene-empty" data-movement-scene><span>Movement pictures are not available for this exercise.</span></div>';
-    if (start && peak && start === peak) {
-      return '<div class="movement-scene movement-scene-pair" data-movement-scene><figure class="movement-position movement-position-single"><img class="repdb-position-image" src="' + esc(start) + '" alt="' + esc(ex.name) + ' movement position" loading="lazy" decoding="async"><figcaption>Hold position</figcaption></figure></div>';
+    if (!start && !peak) return { kind: "empty", reason: "missing" };
+    if (start && peak && start !== peak) return { kind: "illustration", mode: "loop", start, peak };
+    return { kind: "illustration", mode: "hold", src: start || peak, labelled: !!(start && peak) };
+  }
+
+  // Identifies what a scene is showing, so a re-hydrate can skip replacing a scene whose
+  // media has not changed (replacing restarts a playing video and churns the DOM).
+  function mediaKey(media) {
+    if (media.kind === "video") return "video:" + media.clip.model + ":" + media.clip.id;
+    if (media.kind === "empty") return "empty:" + media.reason;
+    if (media.kind === "illustration") return media.mode === "loop" ? "loop:" + media.start + "|" + media.peak : "hold:" + media.src;
+    return media.kind;
+  }
+
+  const EMPTY_MESSAGES = {
+    offline: "Movement pictures need an internet connection. Your form cues are below.",
+    none: "No matching movement pictures are available yet. Your form cues are below.",
+    missing: "Movement pictures are not available for this exercise. Your form cues are below.",
+    broken: "Movement pictures could not be loaded. Your form cues are below."
+  };
+
+  function toggleButton(paused) {
+    const label = paused ? "Play" : "Pause";
+    return '<button class="motion-toggle" type="button" data-motion-toggle aria-pressed="' + String(paused) + '" aria-label="' + label + ' movement preview">' + label + '</button>';
+  }
+
+  // Every state renders inside the same square .movement-stage (see styles.css).
+  function sceneMarkup(ex, media) {
+    const reduced = prefersReducedMotion();
+    const open = (cls, extra) => '<div class="movement-scene ' + cls + (extra || "") + '" data-movement-scene data-media-kind="' + media.kind + '" data-media-key="' + esc(mediaKey(media)) + '">';
+    const stage = (inner, attrs) => '<div class="movement-stage"' + (attrs || "") + '>' + inner + '</div></div>';
+
+    if (media.kind === "video") {
+      const clip = media.clip;
+      const src = "./assets/vital-" + (clip.model === "female" ? "female/" : "free/") + clip.id + ".mp4";
+      // No native controls: the same Play/Pause button as the pose loop, so a list of
+      // exercises has one control system. Reduced motion starts paused, as for stills.
+      return open("movement-scene-video", reduced ? " is-paused" : "") + stage(
+        '<video class="vital-animation" src="' + esc(src) + '" muted loop playsinline preload="metadata"' + (reduced ? ' data-user-paused="true"' : " autoplay") + ' aria-label="Looping ' + esc(clip.model) + ' demonstration of ' + esc(ex.name) + '"></video>' +
+        toggleButton(reduced));
     }
-    if (start && peak) {
-      const reducedMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-      const paused = reducedMotion ? " is-paused" : "";
-      const buttonLabel = reducedMotion ? "Play movement preview" : "Pause movement preview";
-      const buttonText = reducedMotion ? "Play" : "Pause";
-      return '<div class="movement-scene movement-scene-motion' + paused + '" data-movement-scene>' +
-        '<div class="movement-motion-stage" role="group" aria-label="' + esc(ex.name) + ' movement preview, looping between start and peak positions">' +
-        '<img class="motion-frame motion-frame-start" src="' + esc(start) + '" alt="" loading="lazy" decoding="async">' +
-        '<img class="motion-frame motion-frame-peak" src="' + esc(peak) + '" alt="" loading="lazy" decoding="async">' +
+    if (media.kind === "loading") {
+      return open("movement-scene-loading") + stage('<div class="stage-message" aria-live="polite"><span class="visual-loading-dot"></span><span>Loading movement pictures…</span></div>');
+    }
+    if (media.kind === "empty") {
+      return open("movement-scene-empty") + stage('<div class="stage-message"><span class="scene-empty-mark" aria-hidden="true">↗</span><span>' + EMPTY_MESSAGES[media.reason] + '</span></div>');
+    }
+    if (media.mode === "loop") {
+      return open("movement-scene-motion", reduced ? " is-paused" : "") + stage(
+        '<img class="motion-frame motion-frame-start" src="' + esc(media.start) + '" alt="" loading="lazy" decoding="async">' +
+        '<img class="motion-frame motion-frame-peak" src="' + esc(media.peak) + '" alt="" loading="lazy" decoding="async">' +
         '<span class="motion-state motion-state-start" aria-hidden="true">START</span>' +
         '<span class="motion-state motion-state-peak" aria-hidden="true">PEAK</span>' +
-        '<button class="motion-toggle" type="button" data-motion-toggle aria-pressed="' + String(reducedMotion) + '" aria-label="' + buttonLabel + '">' + buttonText + '</button>' +
-        '</div><div class="motion-cycle-track" aria-hidden="true"><span></span></div></div>';
+        toggleButton(reduced) +
+        '<div class="motion-cycle-track" aria-hidden="true"><span></span></div>',
+        ' role="group" aria-label="' + esc(ex.name) + ' movement preview, looping between start and peak positions"');
     }
-    const figures = [];
-    if (start) figures.push('<figure class="movement-position"><img class="repdb-position-image" src="' + esc(start) + '" alt="' + esc(ex.name) + ' start position" loading="lazy" decoding="async"><figcaption>Start</figcaption></figure>');
-    if (start && peak) figures.push('<span class="movement-position-arrow" aria-hidden="true">→</span>');
-    if (peak) figures.push('<figure class="movement-position"><img class="repdb-position-image" src="' + esc(peak) + '" alt="' + esc(ex.name) + ' peak position" loading="lazy" decoding="async"><figcaption>Peak</figcaption></figure>');
-    return '<div class="movement-scene movement-scene-pair" data-movement-scene>' + figures.join("") + '</div>';
+    return open("movement-scene-hold") + stage(
+      '<img class="repdb-position-image stage-image" src="' + esc(media.src) + '" alt="' + esc(ex.name) + ' movement position" loading="lazy" decoding="async">' +
+      (media.labelled ? '<span class="stage-label" aria-hidden="true">HOLD</span>' : ""));
   }
 
-  function guideBadge(ex, record) {
-    const clip = selectedClip(ex);
-    if (clip) return (clip.model === "female" ? "FEMALE" : "MALE") + " VIDEO";
-    if (demoModel === "female") return "NO FEMALE CLIP";
-    const paths = record && record.images && record.images.flat || {};
-    const start = paths.start || paths.main, peak = paths.peak || paths.main;
-    return safeImageUrl(start) && safeImageUrl(peak) && start !== peak ? "POSE LOOP" : "POSITION GUIDE";
+  // Two labels, both describing what is actually on screen. Loading and empty states
+  // show none (they used to claim "POSITION GUIDE" with no picture present).
+  function guideBadge(media) {
+    return media.kind === "video" ? "VIDEO" : media.kind === "illustration" ? "ILLUSTRATION" : "";
   }
 
-  function guideDisclaimer(ex, record) {
-    if (demoModel === "female" && !femaleClips[ex.id]) return "A female video is not included for this movement yet. The available position guide is shown below.";
-    if (demoModel === "female") return "Female demonstration · Use a controlled, comfortable range of motion.";
-    return "Visual positions are a reference. Use a controlled, comfortable range of motion.";
+  const SAFETY = "Use a controlled, comfortable range of motion.";
+  function guideDisclaimer(media) {
+    if (media.kind === "video") {
+      if (media.clip.model === "female") return "Female demonstration · " + SAFETY;
+      if (demoModel === "female") return "No female demonstration for this movement yet, so the male one is shown. " + SAFETY;
+      return "Male demonstration · " + SAFETY;
+    }
+    if (media.kind === "illustration") {
+      if (demoModel === "female") return "No female demonstration for this movement yet, so the illustrated guide is shown. " + SAFETY;
+      return "Illustrated positions are a reference. " + SAFETY;
+    }
+    return SAFETY;
+  }
+
+  function applyChrome(root, media) {
+    const badge = root.querySelector(".demo-badge");
+    if (badge) { const text = guideBadge(media); badge.textContent = text; badge.hidden = !text; }
+    const disclaimer = root.querySelector(".demo-disclaimer");
+    if (disclaimer) disclaimer.textContent = guideDisclaimer(media);
   }
 
   function guideHtml(ex, inline = false) {
     const state = findRecord(ex);
-    const scene = sceneMarkup(ex, state, !state && !catalog && !catalogFailed);
+    const media = mediaFor(ex, state, !state && !catalog && !catalogFailed);
     const f = family(ex), catalogCues = state && Array.isArray(state.instructions_en) ? state.instructions_en.filter(Boolean).slice(0, 3) : [], cues = catalogCues.length ? catalogCues : (instructions[f] || instructions.row);
+    const badge = guideBadge(media);
     return '<section class="movement-guide' + (inline ? ' movement-guide-inline' : '') + '" data-guide-root data-guide-name="' + esc(ex.name) + '" data-guide-equipment="' + esc(ex.equipment) + '" data-guide-id="' + esc(ex.id) + '">' +
-      '<div class="movement-guide-head"><div><span class="eyebrow"><i class="dot"></i>HOW TO PERFORM</span><strong>Movement preview</strong></div><span class="demo-badge">' + guideBadge(ex, state) + '</span></div>' +
-      scene +
-      '<p class="demo-disclaimer">' + guideDisclaimer(ex, state) + '</p>' +
+      '<div class="movement-guide-head"><div><span class="eyebrow"><i class="dot"></i>HOW TO PERFORM</span><strong>Movement preview</strong></div><span class="demo-badge"' + (badge ? "" : " hidden") + '>' + badge + '</span></div>' +
+      sceneMarkup(ex, media) +
+      '<p class="demo-disclaimer">' + guideDisclaimer(media) + '</p>' +
       '<ol class="form-steps">' + cues.map((x, i) => '<li><span>' + (i + 1) + '</span><p>' + esc(x) + '</p></li>').join("") + '</ol></section>';
   }
+
+  const exFromRoot = root => ({ id: root.dataset.guideId, name: root.dataset.guideName, equipment: root.dataset.guideEquipment });
 
   function hydrateGuides() {
     document.querySelectorAll("[data-guide-root]").forEach(root => {
       const scene = root.querySelector("[data-movement-scene]");
       if (!scene) return;
-      const ex = { id: root.dataset.guideId, name: root.dataset.guideName, equipment: root.dataset.guideEquipment };
-      const record = findRecord(ex);
-      scene.outerHTML = sceneMarkup(ex, record, false);
-      const badge = root.querySelector(".demo-badge");
-      if (badge) badge.textContent = guideBadge(ex, record);
-      const disclaimer = root.querySelector(".demo-disclaimer");
-      if (disclaimer) disclaimer.textContent = guideDisclaimer(ex, record);
+      const ex = exFromRoot(root);
+      const media = mediaFor(ex, findRecord(ex), false);
+      // Skip replacing a scene whose media is unchanged: it would restart a playing video.
+      if (scene.dataset.mediaKey !== mediaKey(media)) scene.outerHTML = sceneMarkup(ex, media);
+      applyChrome(root, media);   // the wording can change even when the media does not
     });
   }
 
@@ -283,8 +328,11 @@
 
   const videoObserver = typeof IntersectionObserver === "function"
     ? new IntersectionObserver(entries => entries.forEach(entry => {
-      if (entry.isIntersecting) entry.target.play().catch(() => {});
-      else entry.target.pause();
+      const video = entry.target;
+      // Off-screen always pauses; coming back on-screen resumes only if the user has
+      // not paused it themselves (or reduced motion started it paused).
+      if (entry.isIntersecting) { if (!video.dataset.userPaused) video.play().catch(() => {}); }
+      else video.pause();
     }), { threshold: 0.25 })
     : null;
 
@@ -296,16 +344,22 @@
       if (video.dataset.observed) return;
       video.dataset.observed = "true";
       if (videoObserver) videoObserver.observe(video);
-      else video.play().catch(() => {});
+      else if (!video.dataset.userPaused) video.play().catch(() => {});
     });
   }
 
+  // One Play/Pause control for both the pose loop and the video clip.
   document.addEventListener("click", event => {
     const button = event.target.closest && event.target.closest("[data-motion-toggle]");
     if (!button) return;
-    const scene = button.closest(".movement-scene-motion");
+    const scene = button.closest("[data-movement-scene]");
     if (!scene) return;
     const paused = scene.classList.toggle("is-paused");
+    const video = scene.querySelector("video.vital-animation");
+    if (video) {
+      if (paused) { video.dataset.userPaused = "true"; video.pause(); }
+      else { delete video.dataset.userPaused; video.play().catch(() => {}); }
+    }
     button.setAttribute("aria-pressed", String(paused));
     button.setAttribute("aria-label", paused ? "Play movement preview" : "Pause movement preview");
     button.textContent = paused ? "Play" : "Pause";
@@ -317,24 +371,21 @@
     }));
   });
   videoMutationObserver.observe(document.body, { childList: true, subtree: true });
+
+  // A media element that fails to load is replaced in place. The badge and disclaimer are
+  // updated with it, so a failed video no longer leaves a "VIDEO" badge over a still.
   document.addEventListener("error", event => {
-    const media = event.target;
-    if (media instanceof HTMLVideoElement && media.classList.contains("vital-animation")) {
-      const scene = media.closest("[data-movement-scene]");
-      const root = media.closest("[data-guide-root]");
-      if (scene && root) {
-        const ex = { id: root.dataset.guideId, name: root.dataset.guideName, equipment: root.dataset.guideEquipment };
-        scene.outerHTML = sceneMarkup(ex, findRecord(ex), false, true);
-      }
-      return;
-    }
-    if (!(media instanceof HTMLImageElement) || !(media.classList.contains("repdb-position-image") || media.classList.contains("motion-frame"))) return;
-    const scene = media.closest("[data-movement-scene]");
-    if (scene) {
-      scene.classList.remove("movement-scene-pair", "movement-scene-motion");
-      scene.classList.add("movement-scene-empty");
-      scene.innerHTML = '<span>Movement pictures could not be loaded. Your form cues are below.</span>';
-    }
+    const el = event.target;
+    const isVideo = el instanceof HTMLVideoElement && el.classList.contains("vital-animation");
+    const isImage = el instanceof HTMLImageElement && (el.classList.contains("repdb-position-image") || el.classList.contains("motion-frame"));
+    if (!isVideo && !isImage) return;
+    const scene = el.closest("[data-movement-scene]");
+    const root = el.closest("[data-guide-root]");
+    if (!scene || !root) return;
+    const ex = exFromRoot(root);
+    const next = isVideo ? mediaFor(ex, findRecord(ex), false, true) : { kind: "empty", reason: "broken" };
+    scene.outerHTML = sceneMarkup(ex, next);
+    applyChrome(root, next);
   }, true);
 
   function setDemoModel(model) {
