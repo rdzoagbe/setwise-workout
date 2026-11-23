@@ -51,9 +51,11 @@ Anyone can see the source code in a public repository. Your personal training da
 - 52 built-in exercises available offline, 49 of which have bundled illustrated guides, plus a searchable illustrated RepDB strength catalog when online
 - Build editable 2-, 3-, or 4-day routine templates by goal, experience, and equipment
 - Every exercise preview uses one square frame, one Play/Pause control and one pair of labels (`VIDEO` / `ILLUSTRATION`), so a workout list looks uniform and a guide never jumps as it loads. Video clips autoplay unless you prefer reduced motion, in which case they start paused. The wording under a preview always describes what is actually shown, including when a female demonstration is not available and the male one or an illustration is used instead.
-- Active-workout cards play matching Vital Animations MP4 demos with form cues. Settings lets you choose the demo character; the supplied female clips cover Hack Squat, V-Up, and Smith Machine Bent-Over Row. Other movements use the available illustrated guide until matching female footage is added.
+- Active-workout cards play matching Vital Animations MP4 demos with form cues. Settings lets you choose the demo character, but female demonstrations are not included yet: in female mode each movement shows the male clip or the illustrated guide and says which.
 - Editable routines and custom exercises, including saving an active workout as a reusable routine
 - Edit saved sessions, log timed holds in seconds, and set a weekly session target
+- A rest timer that keeps correct time when the phone is locked or the page reloads, vibrates when rest ends (Android) and can play a short tone; the screen stays on during a workout where the browser supports it (both are in Settings)
+- A workout summary when you finish, with duration, working sets, volume and any new personal records, and a "next: try …" suggestion when you hit every target last time
 - Persistent workout logging with warm-up and working sets, reps or hold time, load, RPE, notes, previous-session reference, and rest timer
 - Session history, weekly volume, estimated one-rep max trends, and personal records
 - Body weight and measurement tracking
@@ -62,11 +64,13 @@ Anyone can see the source code in a public repository. Your personal training da
 - Local JSON backup and restore
 - Dark interface by default, with a light theme in Settings. Both pass WCAG AA contrast on every screen
 - Self-hosted webfonts, so no request ever leaves this origin and the typography works offline
-- Responsive layout and offline app shell; the 19 bundled video demos are local assets, while RepDB illustrations for movements without a local clip require an internet connection
+- Responsive layout and offline app shell; the 16 bundled video demos are local assets, while RepDB illustrations for movements without a local clip require an internet connection
 
 ## Exercise visual credits
 
-Sixteen matched clips from the [Vital Animations Free Pack](https://vitalanimations.com/free-pack) and three female sample clips supplied in its archive are bundled for use in Setwise. The [Vital Animations terms](https://vitalanimations.com/terms) allow hosting or bundling assets within an app and prohibit redistribution as a standalone asset library. Female sample clips currently cover Hack Squat, V-Up, and Smith Machine Bent-Over Row; they are not full male/female pairs for the exercise catalog.
+Sixteen matched clips from the [Vital Animations Free Pack](https://vitalanimations.com/free-pack) are bundled for use in Setwise. The [Vital Animations terms](https://vitalanimations.com/terms) allow hosting or bundling assets within an app and prohibit redistribution as a standalone asset library.
+
+Three female sample clips that were previously bundled have been removed. Their only recorded source was "the archive supplied", and Vital's terms list female clips only in the paid Gym Pro dataset, so their licence could not be confirmed. They can be restored if Vital confirms they are covered.
 
 ## RepDB illustration credits
 

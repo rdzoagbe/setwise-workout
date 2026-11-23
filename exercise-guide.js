@@ -74,11 +74,12 @@
     "cable-lateral-raise": "0095",
     "dumbbell-lateral-raise": "0096"
   };
-  const femaleClips = {
-    "smith-machine-bent-over-row": "1245",
-    "hack-squat": "1254",
-    "v-up": "0976"
-  };
+  // Empty on purpose. Three female sample clips were removed: their only recorded
+  // provenance was "the archive supplied", and Vital Animations' terms list female
+  // clips only in the paid Gym Pro dataset. Restore entries here (exercise id ->
+  // Vital clip id, file in assets/vital-female/) once a licence for them is confirmed.
+  // With no entry, female mode truthfully shows the male clip or the illustrated guide.
+  const femaleClips = {};
   let demoModel = "male";
   const fallbackRecords = {
     "barbell bench press": { name_en: "Barbell Bench Press", equipment: "barbell", images: { flat: { start: "images/flat/bench-press-start.webp", peak: "images/flat/bench-press-peak.webp" } } }

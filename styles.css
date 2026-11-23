@@ -138,3 +138,17 @@
 .more-link{display:flex;align-items:center;gap:12px;width:100%;padding:14px 16px;border:1px solid var(--line);border-radius:14px;background:transparent;color:var(--ink);font:600 14px 'DM Sans',sans-serif;text-align:left;cursor:pointer}
 .more-link svg{width:20px;height:20px;flex:none}
 .more-link.active{border-color:var(--accent)}
+
+/* Stage E: progression hint under "Last time", and the post-workout summary. */
+.next-hint{display:block;white-space:normal!important;overflow:visible!important;text-overflow:clip!important;margin-top:3px;color:var(--ink)!important;font-size:10px!important;font-weight:600}
+.summary-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:4px 0 16px}
+.summary-grid .summary-mini{background:var(--paper)}
+.summary-grid .summary-mini strong{font-size:20px}
+.summary-grid .summary-mini small{color:var(--muted);font-size:11px}
+.summary-heading{display:flex;align-items:center;gap:8px;margin:0 0 8px;color:var(--ink);font:700 14px Manrope,sans-serif}
+.summary-heading svg{width:16px;height:16px;color:var(--accent)}
+.summary-prs{display:grid;gap:8px;margin:0;padding:0;list-style:none}
+.summary-prs li{display:flex;flex-direction:column;gap:2px;padding:10px 12px;border-left:3px solid var(--accent);border-radius:8px;background:var(--paper)}
+.summary-prs strong{color:var(--ink);font-size:13px}
+.summary-prs small,.summary-note{color:var(--muted);font-size:12px}
+.summary-note{margin:0}
