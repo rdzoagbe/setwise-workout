@@ -1025,6 +1025,55 @@ const contrastFailures = (page) => page.evaluate(() => {
   }
 }
 
+// ---------- 22. Phone polish (390px): casing, plurals, titles, no squeezed buttons ----------
+{
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const page = await ctx.newPage();
+  await page.goto(BASE + '/app.html');
+  await page.evaluate(() => localStorage.setItem('setwise-personal-v1', JSON.stringify({
+    version: 1, measurements: [], customExercises: [], workouts: [],
+    preferences: { unit: 'kg', onboardedAt: 'x' },
+    routines: [{ id: 'r1', name: 'Muscle building · Full Body A', focus: 'Full body', notes: '',
+      exercises: [{ exerciseId: 'barbell-bench-press', sets: 3, reps: 6, rest: 90 }] }],
+  })));
+  await page.reload({ waitUntil: 'networkidle' });
+  const home = await page.evaluate(() => ({
+    hero: document.querySelector('.hero-card h2')?.textContent || '',
+    top: document.querySelector('.top-actions [data-action="start-empty"]')?.textContent.trim() }));
+  ok('home hero keeps the routine name\'s casing', home.hero === 'Ready for Muscle building · Full Body A?', home.hero);
+  ok('top button says Start workout when idle', home.top === 'Start workout', home.top);
+  // Count rendered text lines per button: a wrapped label has text rects at 2+ heights.
+  // (Height alone missed it: three lines of 10px text still fit a 40px button.)
+  const squeezed = async () => page.evaluate(() => [...document.querySelectorAll('.page-intro .button')].filter((btn) => {
+    const tops = new Set();
+    const walk = document.createTreeWalker(btn, NodeFilter.SHOW_TEXT);
+    for (let n = walk.nextNode(); n; n = walk.nextNode()) {
+      if (!n.textContent.trim()) continue;
+      const r = document.createRange(); r.selectNodeContents(n);
+      for (const rect of r.getClientRects()) if (rect.width > 0) tops.add(Math.round(rect.top));
+    }
+    return tops.size > 1;
+  }).map((b) => b.textContent.trim()));
+  const wrapped = [];
+  for (const v of ['overview', 'routines']) {
+    await page.evaluate((x) => document.querySelector(`[data-view="${x}"]`).click(), v);
+    await page.waitForTimeout(150);
+    wrapped.push(...await squeezed());
+  }
+  await page.evaluate(() => document.querySelector('[data-action="start-routine"]').click());
+  await page.waitForTimeout(300);
+  wrapped.push(...await squeezed());
+  ok('page action buttons stay on one line at 390px', wrapped.length === 0, wrapped.join(' | ') || 'none wrapped');
+  const train = await page.evaluate(() => ({
+    title: document.querySelector('.page-intro h1').textContent,
+    banner: document.querySelector('.active-banner small').textContent,
+    top: document.querySelector('.top-actions [data-action="start-empty"]').textContent.trim() }));
+  ok('the active workout page is titled with the workout name', train.title === 'Muscle building · Full Body A', train.title);
+  ok('one movement is "1 movement", not "1 movements"', /^1 movement · /.test(train.banner), train.banner);
+  ok('top button says Resume workout during a workout', train.top === 'Resume workout', train.top);
+  await ctx.close();
+}
+
 await browser.close();
 
 const failed = results.filter(r => !r.pass);
