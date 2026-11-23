@@ -899,6 +899,115 @@ const contrastFailures = (page) => page.evaluate(() => {
   await ctx.close();
 }
 
+// ---------- 21. In-gym essentials: rest timer, rest-done signal, wake lock, summary, hint ----------
+{
+  const T0 = Date.parse('2026-11-23T10:00:00Z');
+  const benchSets = (w, reps) => reps.map((r) => ({ weight: w, reps: r, seconds: 0, rpe: null, type: 'working' }));
+  const profile = ({ history = [80, [6, 6, 6]], active = [85, 5], unit = 'kg' } = {}) => JSON.stringify({
+    version: 1, routines: [], measurements: [], customExercises: [],
+    preferences: { unit, theme: 'dark', restSeconds: 90, onboardedAt: '2026-11-01' },
+    workouts: history ? [{ id: 'past', name: 'Past', date: '2026-11-20', startedAt: '2026-11-20T10:00:00Z', duration: 40,
+      exercises: [{ exerciseId: 'barbell-bench-press', targetSets: 3, targetReps: 6, rest: 90, sets: benchSets(history[0], history[1]) }] }] : [],
+    activeWorkout: { id: 'now', name: 'Today', date: '2026-11-23', startedAt: new Date(T0 - 30 * 60000).toISOString(), notes: '',
+      exercises: [{ exerciseId: 'barbell-bench-press', targetSets: 1, targetReps: 6, rest: 90,
+        sets: [{ weight: active[0], reps: active[1], seconds: 0, rpe: '', done: false, type: 'working' }] }] },
+  });
+  // Stubs record what the app asks the browser for, so the checks see real calls.
+  const stubs = () => {
+    window.__vib = []; window.__wl = [];
+    navigator.vibrate = (p) => { window.__vib.push(p); return true; };
+    Object.defineProperty(navigator, 'wakeLock', { configurable: true, value: { request: () => {
+      window.__wl.push('request');
+      const l = { released: false, addEventListener() {}, release() { this.released = true; window.__wl.push('release'); return Promise.resolve(); } };
+      return Promise.resolve(l);
+    } } });
+  };
+  const open = async (payload) => {
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    await ctx.addInitScript(stubs);
+    const page = await ctx.newPage();
+    await page.clock.install({ time: T0 });
+    await page.goto(BASE + '/app.html');
+    await page.evaluate((p) => localStorage.setItem('setwise-personal-v1', p), payload);
+    await page.reload();   // a hash-only goto would stay in the same document and not re-read storage
+    await page.clock.runFor(500);
+    await page.evaluate(() => document.querySelector('[data-view="train"]').click());
+    await page.clock.runFor(300);
+    return { ctx, page };
+  };
+  const restText = (page) => page.evaluate(() => document.querySelector('#rest-clock').textContent);
+  // What the clock SHOULD read: seconds from now to the stored deadline, as mm:ss.
+  const expectedRest = (page) => page.evaluate(() => {
+    const end = JSON.parse(localStorage.getItem('setwise-personal-v1')).activeWorkout.restEndsAt;
+    const n = Math.max(0, Math.ceil((end - Date.now()) / 1000));
+    return { n, text: String(Math.floor(n / 60)).padStart(2, '0') + ':' + String(n % 60).padStart(2, '0') };
+  });
+
+  {
+    const { ctx, page } = await open(profile());
+    ok('wake lock is requested while a workout is active', (await page.evaluate(() => window.__wl)).includes('request'),
+       JSON.stringify(await page.evaluate(() => window.__wl)));
+    await page.click('[data-action="toggle-set"]');            // ticking a set starts the 90s rest
+    await page.clock.runFor(300);
+    const started = await restText(page);
+    // Jump the wall clock 60s WITHOUT running timers: what a locked phone does.
+    await page.clock.setSystemTime(T0 + 60000 + 400);
+    await page.clock.runFor(300);
+    const after = await restText(page), want = await expectedRest(page);
+    // The old decrementing timer would still read ~01:29 here, having missed the 60s.
+    ok('rest timer follows the clock after timers were suspended for 60s',
+       started === '01:30' && after === want.text && want.n >= 29 && want.n <= 31, `${started} -> ${after} (expected ${want.text})`);
+    await page.reload();
+    await page.clock.runFor(500);
+    await page.evaluate(() => document.querySelector('[data-view="train"]').click());
+    await page.clock.runFor(300);
+    const reloaded = await restText(page), want2 = await expectedRest(page);
+    ok('a reload mid-rest keeps the remaining time', reloaded === want2.text && want2.n >= 28 && want2.n <= 31, `${reloaded} (expected ${want2.text})`);
+    await page.clock.runFor(32000);
+    const done = await page.evaluate(() => ({ vib: window.__vib, toast: [...document.querySelectorAll('.toast')].map((t) => t.textContent).join('|') }));
+    ok('rest end vibrates once and shows the toast', done.vib.length === 1 && /Rest timer complete/.test(done.toast), JSON.stringify(done));
+    await page.click('[data-action="finish-workout"]');
+    await page.click('[data-action="confirm-finish"]');
+    await page.clock.runFor(500);
+    const sum = await page.evaluate(() => {
+      const m = document.querySelector('#modal-root .modal');
+      return { title: m?.querySelector('h2')?.textContent, prs: [...(m?.querySelectorAll('.summary-prs li') || [])].map((l) => l.textContent), wl: window.__wl };
+    });
+    ok('finishing shows a summary with the new heaviest-weight record', sum.title === 'Workout complete' && sum.prs.length === 1 &&
+       /Barbell Bench Press/.test(sum.prs[0]) && /Heaviest weight: 85 kg \(was 80 kg\)/.test(sum.prs[0]), JSON.stringify(sum.prs));
+    ok('wake lock is released when the workout ends', sum.wl.includes('release'), JSON.stringify(sum.wl));
+    for (const theme of ['dark', 'light']) {
+      await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme);
+      await page.clock.runFor(400);
+      const f = await contrastFailures(page);
+      ok(`workout summary passes WCAG AA in the ${theme} theme`, f.length === 0, f.slice(0, 4).join(' | ') || 'all text passes');
+    }
+    await ctx.close();
+  }
+  {
+    const { ctx, page } = await open(profile({ active: [75, 5] }));
+    await page.click('[data-action="toggle-set"]');
+    await page.click('[data-action="finish-workout"]');
+    await page.click('[data-action="confirm-finish"]');
+    await page.clock.runFor(500);
+    const sum = await page.evaluate(() => ({ prs: document.querySelectorAll('.summary-prs li').length, note: document.querySelector('.summary-note')?.textContent || '' }));
+    ok('a lighter session reports no record', sum.prs === 0 && /No new records/.test(sum.note), JSON.stringify(sum));
+    await ctx.close();
+  }
+  {
+    const hint = async (opts) => {
+      const { ctx, page } = await open(profile(opts));
+      const h = await page.evaluate(() => document.querySelector('.next-hint')?.textContent || '');
+      await ctx.close();
+      return h;
+    };
+    const kg = await hint({}), lb = await hint({ unit: 'lb' }), missed = await hint({ history: [80, [6, 6, 5]] }), none = await hint({ history: null });
+    ok('progression hint suggests +2.5 kg after every target was hit', /try 82\.5 kg$/.test(kg), kg);
+    ok('progression hint uses +5 lb in imperial', /try 180 lb$/.test(lb), lb);
+    ok('no hint when a target was missed, or with no history', missed === '' && none === '', JSON.stringify({ missed, none }));
+  }
+}
+
 await browser.close();
 
 const failed = results.filter(r => !r.pass);

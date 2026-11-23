@@ -54,6 +54,8 @@ Anyone can see the source code in a public repository. Your personal training da
 - Active-workout cards play matching Vital Animations MP4 demos with form cues. Settings lets you choose the demo character, but female demonstrations are not included yet: in female mode each movement shows the male clip or the illustrated guide and says which.
 - Editable routines and custom exercises, including saving an active workout as a reusable routine
 - Edit saved sessions, log timed holds in seconds, and set a weekly session target
+- A rest timer that keeps correct time when the phone is locked or the page reloads, vibrates when rest ends (Android) and can play a short tone; the screen stays on during a workout where the browser supports it (both are in Settings)
+- A workout summary when you finish, with duration, working sets, volume and any new personal records, and a "next: try …" suggestion when you hit every target last time
 - Persistent workout logging with warm-up and working sets, reps or hold time, load, RPE, notes, previous-session reference, and rest timer
 - Session history, weekly volume, estimated one-rep max trends, and personal records
 - Body weight and measurement tracking
