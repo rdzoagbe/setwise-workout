@@ -903,13 +903,13 @@ const contrastFailures = (page) => page.evaluate(() => {
 {
   const T0 = Date.parse('2026-11-23T10:00:00Z');
   const benchSets = (w, reps) => reps.map((r) => ({ weight: w, reps: r, seconds: 0, rpe: null, type: 'working' }));
-  const profile = ({ history = [80, [6, 6, 6]], active = [85, 5], unit = 'kg' } = {}) => JSON.stringify({
+  const profile = ({ history = [80, [6, 6, 6]], active = [85, 5], unit = 'kg', ex = 'barbell-bench-press', histSets = 3 } = {}) => JSON.stringify({
     version: 1, routines: [], measurements: [], customExercises: [],
     preferences: { unit, theme: 'dark', restSeconds: 90, onboardedAt: '2026-11-01' },
     workouts: history ? [{ id: 'past', name: 'Past', date: '2026-11-20', startedAt: '2026-11-20T10:00:00Z', duration: 40,
-      exercises: [{ exerciseId: 'barbell-bench-press', targetSets: 3, targetReps: 6, rest: 90, sets: benchSets(history[0], history[1]) }] }] : [],
+      exercises: [{ exerciseId: ex, targetSets: histSets, targetReps: 6, rest: 90, sets: benchSets(history[0], history[1]) }] }] : [],
     activeWorkout: { id: 'now', name: 'Today', date: '2026-11-23', startedAt: new Date(T0 - 30 * 60000).toISOString(), notes: '',
-      exercises: [{ exerciseId: 'barbell-bench-press', targetSets: 1, targetReps: 6, rest: 90,
+      exercises: [{ exerciseId: ex, targetSets: 1, targetReps: 6, rest: 90,
         sets: [{ weight: active[0], reps: active[1], seconds: 0, rpe: '', done: false, type: 'working' }] }] },
   });
   // Stubs record what the app asks the browser for, so the checks see real calls.
@@ -995,6 +995,17 @@ const contrastFailures = (page) => page.evaluate(() => {
     await ctx.close();
   }
   {
+    // More assistance is easier, so it must never be reported as a heavier record.
+    const { ctx, page } = await open(profile({ ex: 'assisted-pull-up', history: [40, [6, 6, 6]], active: [50, 6] }));
+    await page.click('[data-action="toggle-set"]');
+    await page.click('[data-action="finish-workout"]');
+    await page.click('[data-action="confirm-finish"]');
+    await page.clock.runFor(500);
+    const n = await page.evaluate(() => document.querySelectorAll('.summary-prs li').length);
+    ok('more assistance is never reported as a personal record', n === 0, `${n} records`);
+    await ctx.close();
+  }
+  {
     const hint = async (opts) => {
       const { ctx, page } = await open(profile(opts));
       const h = await page.evaluate(() => document.querySelector('.next-hint')?.textContent || '');
@@ -1005,6 +1016,12 @@ const contrastFailures = (page) => page.evaluate(() => {
     ok('progression hint suggests +2.5 kg after every target was hit', /try 82\.5 kg$/.test(kg), kg);
     ok('progression hint uses +5 lb in imperial', /try 180 lb$/.test(lb), lb);
     ok('no hint when a target was missed, or with no history', missed === '' && none === '', JSON.stringify({ missed, none }));
+    // Codex review on #5: an unfinished session (1 of 3 planned sets) is not "all targets hit".
+    const partial = await hint({ history: [80, [6]] });
+    ok('no hint when fewer sets were logged than planned', partial === '', partial);
+    // Codex review on #5: on an assisted movement, progress means LESS assistance.
+    const assisted = await hint({ ex: 'assisted-pull-up', history: [40, [6, 6, 6]] });
+    ok('assisted movements suggest less assistance, not more load', /try 37\.5 kg of assistance$/.test(assisted), assisted);
   }
 }
 
