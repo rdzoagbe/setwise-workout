@@ -1074,6 +1074,77 @@ const contrastFailures = (page) => page.evaluate(() => {
   await ctx.close();
 }
 
+// ---------- 23. Existing users can reach setup and the plan proposal ----------
+{
+  const existing = (prefs = {}) => JSON.stringify({ version: 1, measurements: [], customExercises: [], workouts: [],
+    preferences: { unit: 'kg', ...prefs },
+    routines: [{ id: 'mine', name: 'My own routine', focus: 'Mine', notes: '', exercises: [{ exerciseId: 'barbell-bench-press', sets: 3, reps: 8, rest: 90 }] }] });
+  const openWith = async (payload) => {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    const page = await ctx.newPage();
+    await page.goto(BASE + '/app.html');
+    await page.evaluate((p) => localStorage.setItem('setwise-personal-v1', p), payload);
+    await page.reload({ waitUntil: 'networkidle' });
+    return { ctx, page };
+  };
+  const stored = (page) => page.evaluate(() => JSON.parse(localStorage.getItem('setwise-personal-v1')));
+  {
+    const { ctx, page } = await openWith(existing());
+    const st = await page.evaluate(() => ({ card: !!document.querySelector('.setup-card'), overlay: !!document.querySelector('.onboarding') }));
+    ok('an existing user without setup sees the "Get a plan built for you" card (and no forced overlay)', st.card && !st.overlay, JSON.stringify(st));
+    for (const theme of ['dark', 'light']) {
+      await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme);
+      await page.waitForTimeout(350);
+      const f = (await contrastFailures(page)).filter((x) => /plan built|quick questions|Build my plan|Not now|NEW/.test(x));
+      ok(`setup card passes WCAG AA in the ${theme} theme`, f.length === 0, f.join(' | ') || 'all text passes');
+    }
+    await page.click('.setup-card [data-action="setup-plan"]');
+    ok('"Build my plan" opens setup', await page.locator('.onboarding').count() > 0);
+    await page.click('.ob-foot .button-primary');                       // profile
+    await page.click('[data-ob-set="experience"][data-value="advanced"]');
+    await page.click('.ob-foot .button-primary');
+    await page.click('.ob-foot .button-primary');                       // goal (default)
+    await page.click('.ob-foot .button-primary');                       // equipment (default)
+    await page.click('[data-ob-set="days"][data-value="2"]');
+    await page.click('.ob-foot .button-primary');                       // Create my plan
+    await page.waitForTimeout(300);
+    const d = await stored(page);
+    const names = d.routines.map((r) => r.name);
+    ok('finishing keeps the user\'s own routines and adds the new plan',
+       names[0] === 'My own routine' && names.length === 3 && d.preferences.experience === 'advanced' && !!d.preferences.onboardedAt, names.join(' | '));
+    const toast = await page.evaluate(() => [...document.querySelectorAll('.toast')].map((t) => t.textContent).join('|'));
+    ok('the toast says existing routines are kept', /2 routines added\. Your existing routines are kept\./.test(toast), toast);
+    await page.evaluate(() => document.querySelector('[data-view="overview"]').click());
+    ok('the card is gone once setup is done', await page.locator('.setup-card').count() === 0);
+    await ctx.close();
+  }
+  {
+    const { ctx, page } = await openWith(existing());
+    await page.click('.setup-card [data-action="setup-dismiss"]');
+    await page.reload({ waitUntil: 'networkidle' });
+    ok('"Not now" hides the card for good', await page.locator('.setup-card').count() === 0);
+    await ctx.close();
+  }
+  {
+    const { ctx, page } = await openWith(existing({ onboardedAt: 'x', experience: 'advanced', goal: 'strength', equipment: 'home', weeklyTarget: 4 }));
+    await page.evaluate(() => document.querySelector('[data-view="settings"]').click());
+    await page.click('[data-action="setup-plan"]');
+    const pre = [];
+    for (let i = 0; i < 5; i++) {
+      pre.push(await page.evaluate(() => document.querySelector('.ob-choice[aria-checked="true"]')?.dataset.value || ''));
+      if (i < 4) await page.click('.ob-foot .button-primary');
+    }
+    ok('Settings → Redo setup opens setup with the saved answers selected',
+       JSON.stringify(pre) === JSON.stringify(['', 'advanced', 'strength', 'home', '4']), JSON.stringify(pre));
+    await page.click('.ob-skip');
+    const d = await stored(page);
+    ok('skipping a redo changes nothing', d.routines.length === 1 && d.preferences.goal === 'strength', `${d.routines.length} routines`);
+    const home = await page.evaluate(() => document.querySelector('a[href="./?landing=1"]')?.textContent.trim());
+    ok('Settings links to the Setwise home page', home === 'Open home page', home);
+    await ctx.close();
+  }
+}
+
 await browser.close();
 
 const failed = results.filter(r => !r.pass);

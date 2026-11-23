@@ -8,7 +8,7 @@ https://rdzoagbe.github.io/setwise-workout/
 
 The root URL is a landing page (`index.html`); the app itself is `app.html`. A visitor who already has Setwise data in their browser is forwarded straight into the app, so returning users and installed copies never see the landing page. Add `?landing=1` to view it anyway (Settings → About Setwise links there).
 
-The first time someone opens the app with no saved data, a short setup asks for an optional name, units, experience level (Beginner / Intermediate / Advanced), goal, equipment and training days, then builds a starting plan. The profile is stored only in the browser, like everything else. Anyone with existing data never sees this setup.
+The first time someone opens the app with no saved data, a short setup asks for an optional name, units, experience level (Beginner / Intermediate / Advanced), goal, equipment and training days, then builds a starting plan. The profile is stored only in the browser, like everything else. Anyone with existing data is never forced through it; instead, Home shows a "Get a plan built for you" card (until dismissed), and Settings → Your plan → Redo setup reopens it at any time. For someone with data, the new plan is added alongside their existing routines rather than replacing them.
 
 ## Run it
 
