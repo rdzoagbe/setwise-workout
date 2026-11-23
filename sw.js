@@ -1,4 +1,4 @@
-const CACHE = "setwise-shell-v18";
+const CACHE = "setwise-shell-v21";
 
 // Required shell. cache.addAll() is atomic: if any one of these fails, install
 // rejects and the app gets NO offline support at all. Keep this list to files

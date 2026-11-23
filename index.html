@@ -10,13 +10,15 @@
   <title>Setwise — a free, private strength training log</title>
   <link rel="icon" href="./icon.svg" type="image/svg+xml">
   <link rel="manifest" href="./manifest.webmanifest">
-  <script>/* Returning users skip the landing page. Runs before first paint, so there is no flash.
-     Anyone with stored Setwise data (including installed apps still launching the old
-     start URL "./") goes straight into the app, keeping any #view in the URL.
-     ?landing=1 shows this page anyway, e.g. from "About Setwise" in the app's settings. */
+  <script>/* In a browser this page always shows, so everyone can see it and press Start now.
+     Only the INSTALLED app skips it: older installs still launch the old start URL "./",
+     and opening a marketing page every time you launch an app would be wrong. That case
+     is detected by display-mode (standalone) plus stored data, before first paint.
+     ?landing=1 shows this page even in the installed app (Settings -> Open home page). */
     try{
       var d=localStorage.getItem("setwise-personal-v1");
-      if(d!==null&&!/[?&]landing=1(&|$)/.test(location.search)){location.replace("./app.html"+location.hash);}
+      var installed=(window.matchMedia&&matchMedia("(display-mode: standalone)").matches)||navigator.standalone===true;
+      if(d!==null&&installed&&!/[?&]landing=1(&|$)/.test(location.search)){location.replace("./app.html"+location.hash);}
       var p=JSON.parse(d||"{}");
       document.documentElement.setAttribute("data-theme",(p.preferences&&p.preferences.theme)==="light"?"light":"dark");
     }catch(e){document.documentElement.setAttribute("data-theme","dark");}</script>
@@ -39,10 +41,10 @@
         <h1>Plan, log and progress your lifts. Privately.</h1>
         <p class="lp-lead">Setwise runs in your browser and installs on your phone like an app. No account, no subscription, and your training history never leaves your device.</p>
         <div class="lp-cta">
-          <a class="button button-primary" href="./app.html">Get started — it's free</a>
+          <a class="button button-primary" href="./app.html?setup=1" data-start-now>Start now — create your profile</a>
           <a class="button button-secondary" href="#features">See what's inside</a>
         </div>
-        <p class="lp-note">Answer five quick questions and get a starting plan for your experience, goal, equipment and schedule.</p>
+        <p class="lp-note">Create your profile in five quick questions (level, goal, equipment and schedule) and get a starting plan. No sign-up or password: your profile is stored only on this device.</p>
       </div>
 
       <!-- Product visual: plain HTML and CSS, deliberately no third-party imagery. -->
@@ -105,7 +107,7 @@
 
     <section class="lp-final">
       <h2>Your next session starts here.</h2>
-      <a class="button button-primary" href="./app.html">Get started — it's free</a>
+      <a class="button button-primary" href="./app.html?setup=1" data-start-now>Start now — create your profile</a>
     </section>
   </main>
 

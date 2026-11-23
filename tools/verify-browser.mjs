@@ -683,7 +683,7 @@ const contrastFailures = (page) => page.evaluate(() => {
   ok('a new visitor at / sees the landing page', landing.isLanding && page.url() === BASE + '/', page.url());
   ok('the landing page makes zero off-origin requests', offOrigin.length === 0, offOrigin.slice(0, 3).join(' ') || 'none');
   ok('the landing page loads no external script files at all', landing.scripts === 0, `${landing.scripts} script src`);
-  ok('every primary call to action opens the app', landing.ctas.length >= 2 && landing.ctas.every((h) => h === './app.html'), landing.ctas.join(' '));
+  ok('every primary call to action opens profile setup in the app', landing.ctas.length >= 2 && landing.ctas.every((h) => h === './app.html?setup=1'), landing.ctas.join(' '));
   for (const theme of ['dark', 'light']) {
     await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme);
     await page.evaluate(() => document.querySelectorAll('details').forEach((d) => { d.open = true; }));
@@ -694,29 +694,71 @@ const contrastFailures = (page) => page.evaluate(() => {
   await ctx.close();
 }
 
-// ---------- 17. Returning users skip the landing page ----------
+// ---------- 17. Landing page shows in a browser; only the installed app skips it ----------
 {
-  const ctx = await browser.newContext();
-  const seed = await ctx.newPage();
-  await seed.goto(BASE + '/?landing=1', { waitUntil: 'networkidle' });
-  await seed.evaluate(() => localStorage.setItem('setwise-personal-v1', JSON.stringify({
-    version: 1, preferences: {}, routines: [], workouts: [], measurements: [], customExercises: [] })));
-  await seed.close();
+  const seedData = async (ctx) => {
+    const seed = await ctx.newPage();
+    await seed.goto(BASE + '/?landing=1', { waitUntil: 'networkidle' });
+    await seed.evaluate(() => localStorage.setItem('setwise-personal-v1', JSON.stringify({
+      version: 1, preferences: {}, routines: [], workouts: [], measurements: [], customExercises: [] })));
+    await seed.close();
+  };
   // A fresh page each time: a hash-only change on an open page is same-document
-  // navigation, which never re-runs the forwarding script and would fake a failure.
-  const visit = async (path) => {
+  // navigation, which never re-runs the forwarding script and would fake a result.
+  const visit = async (ctx, path) => {
     const p = await ctx.newPage();
     await p.goto(BASE + path, { waitUntil: 'networkidle' });
     const url = p.url().replace(BASE, '');
     await p.close();
     return url;
   };
-  const root = await visit('/');
-  const hash = await visit('/#progress');
-  const bypass = await visit('/?landing=1');
-  ok('a returning user at / goes straight to the app', root === '/app.html', root);
+  const browserCtx = await browser.newContext();
+  await seedData(browserCtx);
+  const inBrowser = await visit(browserCtx, '/');
+  ok('a returning user in a browser still sees the landing page at /', inBrowser === '/', inBrowser);
+  await browserCtx.close();
+  // The installed app reports display-mode: standalone; emulate that.
+  const appCtx = await browser.newContext();
+  await appCtx.addInitScript(() => {
+    const real = window.matchMedia.bind(window);
+    window.matchMedia = (q) => /display-mode:\s*standalone/.test(q) ? { matches: true, media: q, addEventListener() {}, removeEventListener() {} } : real(q);
+  });
+  await seedData(appCtx);
+  const root = await visit(appCtx, '/');
+  const hash = await visit(appCtx, '/#progress');
+  const bypass = await visit(appCtx, '/?landing=1');
+  ok('the installed app (old start URL) goes straight into the app', root === '/app.html', root);
   ok('the forward keeps the #view from the URL', hash === '/app.html#progress', hash);
-  ok('?landing=1 shows the landing page even with stored data', bypass === '/?landing=1', bypass);
+  ok('?landing=1 shows the landing page even in the installed app', bypass === '/?landing=1', bypass);
+  await appCtx.close();
+}
+
+// ---------- 17b. "Start now" on the landing page leads to profile setup ----------
+{
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const page = await ctx.newPage();
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' });
+  const ctas = await page.evaluate(() => [...document.querySelectorAll('[data-start-now]')].map((a) => a.textContent.trim() + ' -> ' + a.getAttribute('href')));
+  ok('the landing page has "Start now" buttons that open profile setup',
+     ctas.length === 2 && ctas.every((c) => /^Start now/.test(c) && /app\.html\?setup=1$/.test(c)), ctas.join(' | '));
+  await page.click('.lp-hero [data-start-now]');
+  await page.waitForLoadState('networkidle');
+  const first = await page.evaluate(() => ({ ob: !!document.querySelector('.onboarding'), url: location.pathname + location.search }));
+  ok('a new visitor pressing Start now gets the setup', first.ob && first.url.endsWith('/app.html'), JSON.stringify(first));
+  // Same button for someone who already has data: setup opens, routines are kept.
+  await page.click('.ob-skip');
+  await page.evaluate(() => { const d = JSON.parse(localStorage.getItem('setwise-personal-v1')); d.routines = [{ id: 'mine', name: 'Mine', focus: 'x', notes: '', exercises: [] }]; localStorage.setItem('setwise-personal-v1', JSON.stringify(d)); });
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' });
+  ok('a returning visitor in a browser lands on the landing page', page.url() === BASE + '/', page.url());
+  await page.click('.lp-hero [data-start-now]');
+  await page.waitForLoadState('networkidle');
+  ok('a returning visitor pressing Start now also gets the setup', await page.locator('.onboarding').count() > 0);
+  for (let i = 0; i < 5; i++) await page.click('.ob-foot .button-primary');
+  await page.waitForTimeout(300);
+  const names = await page.evaluate(() => JSON.parse(localStorage.getItem('setwise-personal-v1')).routines.map((r) => r.name));
+  ok('their existing routines are kept when the plan is created', names[0] === 'Mine' && names.length > 1, names.join(' | '));
+  await page.reload({ waitUntil: 'networkidle' });
+  ok('reloading afterwards does not reopen setup', await page.locator('.onboarding').count() === 0);
   await ctx.close();
 }
 
@@ -834,7 +876,12 @@ const contrastFailures = (page) => page.evaluate(() => {
   await offlineApp.goto(BASE + '/app.html', { waitUntil: 'domcontentloaded' });
   await offlineApp.waitForTimeout(800);
   const appOk = await offlineApp.evaluate(() => (document.querySelector('#app-content') || {}).textContent?.length > 50);
+  // An old install launches "./" in standalone display mode; emulate that for this page.
   const oldStart = await ctx.newPage();
+  await oldStart.addInitScript(() => {
+    const real = window.matchMedia.bind(window);
+    window.matchMedia = (q) => /display-mode:\s*standalone/.test(q) ? { matches: true, media: q, addEventListener() {}, removeEventListener() {} } : real(q);
+  });
   await oldStart.goto(BASE + '/', { waitUntil: 'domcontentloaded' });
   await oldStart.waitForTimeout(800);
   ok('offline, the installed app still opens', appOk === true);
@@ -1022,6 +1069,126 @@ const contrastFailures = (page) => page.evaluate(() => {
     // Codex review on #5: on an assisted movement, progress means LESS assistance.
     const assisted = await hint({ ex: 'assisted-pull-up', history: [40, [6, 6, 6]] });
     ok('assisted movements suggest less assistance, not more load', /try 37\.5 kg of assistance$/.test(assisted), assisted);
+  }
+}
+
+// ---------- 22. Phone polish (390px): casing, plurals, titles, no squeezed buttons ----------
+{
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const page = await ctx.newPage();
+  await page.goto(BASE + '/app.html');
+  await page.evaluate(() => localStorage.setItem('setwise-personal-v1', JSON.stringify({
+    version: 1, measurements: [], customExercises: [], workouts: [],
+    preferences: { unit: 'kg', onboardedAt: 'x' },
+    routines: [{ id: 'r1', name: 'Muscle building · Full Body A', focus: 'Full body', notes: '',
+      exercises: [{ exerciseId: 'barbell-bench-press', sets: 3, reps: 6, rest: 90 }] }],
+  })));
+  await page.reload({ waitUntil: 'networkidle' });
+  const home = await page.evaluate(() => ({
+    hero: document.querySelector('.hero-card h2')?.textContent || '',
+    top: document.querySelector('.top-actions [data-action="start-empty"]')?.textContent.trim() }));
+  ok('home hero keeps the routine name\'s casing', home.hero === 'Ready for Muscle building · Full Body A?', home.hero);
+  ok('top button says Start workout when idle', home.top === 'Start workout', home.top);
+  // Count rendered text lines per button: a wrapped label has text rects at 2+ heights.
+  // (Height alone missed it: three lines of 10px text still fit a 40px button.)
+  const squeezed = async () => page.evaluate(() => [...document.querySelectorAll('.page-intro .button')].filter((btn) => {
+    const tops = new Set();
+    const walk = document.createTreeWalker(btn, NodeFilter.SHOW_TEXT);
+    for (let n = walk.nextNode(); n; n = walk.nextNode()) {
+      if (!n.textContent.trim()) continue;
+      const r = document.createRange(); r.selectNodeContents(n);
+      for (const rect of r.getClientRects()) if (rect.width > 0) tops.add(Math.round(rect.top));
+    }
+    return tops.size > 1;
+  }).map((b) => b.textContent.trim()));
+  const wrapped = [];
+  for (const v of ['overview', 'routines']) {
+    await page.evaluate((x) => document.querySelector(`[data-view="${x}"]`).click(), v);
+    await page.waitForTimeout(150);
+    wrapped.push(...await squeezed());
+  }
+  await page.evaluate(() => document.querySelector('[data-action="start-routine"]').click());
+  await page.waitForTimeout(300);
+  wrapped.push(...await squeezed());
+  ok('page action buttons stay on one line at 390px', wrapped.length === 0, wrapped.join(' | ') || 'none wrapped');
+  const train = await page.evaluate(() => ({
+    title: document.querySelector('.page-intro h1').textContent,
+    banner: document.querySelector('.active-banner small').textContent,
+    top: document.querySelector('.top-actions [data-action="start-empty"]').textContent.trim() }));
+  ok('the active workout page is titled with the workout name', train.title === 'Muscle building · Full Body A', train.title);
+  ok('one movement is "1 movement", not "1 movements"', /^1 movement · /.test(train.banner), train.banner);
+  ok('top button says Resume workout during a workout', train.top === 'Resume workout', train.top);
+  await ctx.close();
+}
+
+// ---------- 23. Existing users can reach setup and the plan proposal ----------
+{
+  const existing = (prefs = {}) => JSON.stringify({ version: 1, measurements: [], customExercises: [], workouts: [],
+    preferences: { unit: 'kg', ...prefs },
+    routines: [{ id: 'mine', name: 'My own routine', focus: 'Mine', notes: '', exercises: [{ exerciseId: 'barbell-bench-press', sets: 3, reps: 8, rest: 90 }] }] });
+  const openWith = async (payload) => {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    const page = await ctx.newPage();
+    await page.goto(BASE + '/app.html');
+    await page.evaluate((p) => localStorage.setItem('setwise-personal-v1', p), payload);
+    await page.reload({ waitUntil: 'networkidle' });
+    return { ctx, page };
+  };
+  const stored = (page) => page.evaluate(() => JSON.parse(localStorage.getItem('setwise-personal-v1')));
+  {
+    const { ctx, page } = await openWith(existing());
+    const st = await page.evaluate(() => ({ card: !!document.querySelector('.setup-card'), overlay: !!document.querySelector('.onboarding') }));
+    ok('an existing user without setup sees the "Get a plan built for you" card (and no forced overlay)', st.card && !st.overlay, JSON.stringify(st));
+    for (const theme of ['dark', 'light']) {
+      await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme);
+      await page.waitForTimeout(350);
+      const f = (await contrastFailures(page)).filter((x) => /plan built|quick questions|Build my plan|Not now|NEW/.test(x));
+      ok(`setup card passes WCAG AA in the ${theme} theme`, f.length === 0, f.join(' | ') || 'all text passes');
+    }
+    await page.click('.setup-card [data-action="setup-plan"]');
+    ok('"Build my plan" opens setup', await page.locator('.onboarding').count() > 0);
+    await page.click('.ob-foot .button-primary');                       // profile
+    await page.click('[data-ob-set="experience"][data-value="advanced"]');
+    await page.click('.ob-foot .button-primary');
+    await page.click('.ob-foot .button-primary');                       // goal (default)
+    await page.click('.ob-foot .button-primary');                       // equipment (default)
+    await page.click('[data-ob-set="days"][data-value="2"]');
+    await page.click('.ob-foot .button-primary');                       // Create my plan
+    await page.waitForTimeout(300);
+    const d = await stored(page);
+    const names = d.routines.map((r) => r.name);
+    ok('finishing keeps the user\'s own routines and adds the new plan',
+       names[0] === 'My own routine' && names.length === 3 && d.preferences.experience === 'advanced' && !!d.preferences.onboardedAt, names.join(' | '));
+    const toast = await page.evaluate(() => [...document.querySelectorAll('.toast')].map((t) => t.textContent).join('|'));
+    ok('the toast says existing routines are kept', /2 routines added\. Your existing routines are kept\./.test(toast), toast);
+    await page.evaluate(() => document.querySelector('[data-view="overview"]').click());
+    ok('the card is gone once setup is done', await page.locator('.setup-card').count() === 0);
+    await ctx.close();
+  }
+  {
+    const { ctx, page } = await openWith(existing());
+    await page.click('.setup-card [data-action="setup-dismiss"]');
+    await page.reload({ waitUntil: 'networkidle' });
+    ok('"Not now" hides the card for good', await page.locator('.setup-card').count() === 0);
+    await ctx.close();
+  }
+  {
+    const { ctx, page } = await openWith(existing({ onboardedAt: 'x', experience: 'advanced', goal: 'strength', equipment: 'home', weeklyTarget: 4 }));
+    await page.evaluate(() => document.querySelector('[data-view="settings"]').click());
+    await page.click('[data-action="setup-plan"]');
+    const pre = [];
+    for (let i = 0; i < 5; i++) {
+      pre.push(await page.evaluate(() => document.querySelector('.ob-choice[aria-checked="true"]')?.dataset.value || ''));
+      if (i < 4) await page.click('.ob-foot .button-primary');
+    }
+    ok('Settings → Redo setup opens setup with the saved answers selected',
+       JSON.stringify(pre) === JSON.stringify(['', 'advanced', 'strength', 'home', '4']), JSON.stringify(pre));
+    await page.click('.ob-skip');
+    const d = await stored(page);
+    ok('skipping a redo changes nothing', d.routines.length === 1 && d.preferences.goal === 'strength', `${d.routines.length} routines`);
+    const home = await page.evaluate(() => document.querySelector('a[href="./?landing=1"]')?.textContent.trim());
+    ok('Settings links to the Setwise home page', home === 'Open home page', home);
+    await ctx.close();
   }
 }
 
