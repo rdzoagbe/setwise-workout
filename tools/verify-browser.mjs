@@ -683,7 +683,7 @@ const contrastFailures = (page) => page.evaluate(() => {
   ok('a new visitor at / sees the landing page', landing.isLanding && page.url() === BASE + '/', page.url());
   ok('the landing page makes zero off-origin requests', offOrigin.length === 0, offOrigin.slice(0, 3).join(' ') || 'none');
   ok('the landing page loads no external script files at all', landing.scripts === 0, `${landing.scripts} script src`);
-  ok('every primary call to action opens the app', landing.ctas.length >= 2 && landing.ctas.every((h) => h === './app.html'), landing.ctas.join(' '));
+  ok('every primary call to action opens profile setup in the app', landing.ctas.length >= 2 && landing.ctas.every((h) => h === './app.html?setup=1'), landing.ctas.join(' '));
   for (const theme of ['dark', 'light']) {
     await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme);
     await page.evaluate(() => document.querySelectorAll('details').forEach((d) => { d.open = true; }));
@@ -694,29 +694,71 @@ const contrastFailures = (page) => page.evaluate(() => {
   await ctx.close();
 }
 
-// ---------- 17. Returning users skip the landing page ----------
+// ---------- 17. Landing page shows in a browser; only the installed app skips it ----------
 {
-  const ctx = await browser.newContext();
-  const seed = await ctx.newPage();
-  await seed.goto(BASE + '/?landing=1', { waitUntil: 'networkidle' });
-  await seed.evaluate(() => localStorage.setItem('setwise-personal-v1', JSON.stringify({
-    version: 1, preferences: {}, routines: [], workouts: [], measurements: [], customExercises: [] })));
-  await seed.close();
+  const seedData = async (ctx) => {
+    const seed = await ctx.newPage();
+    await seed.goto(BASE + '/?landing=1', { waitUntil: 'networkidle' });
+    await seed.evaluate(() => localStorage.setItem('setwise-personal-v1', JSON.stringify({
+      version: 1, preferences: {}, routines: [], workouts: [], measurements: [], customExercises: [] })));
+    await seed.close();
+  };
   // A fresh page each time: a hash-only change on an open page is same-document
-  // navigation, which never re-runs the forwarding script and would fake a failure.
-  const visit = async (path) => {
+  // navigation, which never re-runs the forwarding script and would fake a result.
+  const visit = async (ctx, path) => {
     const p = await ctx.newPage();
     await p.goto(BASE + path, { waitUntil: 'networkidle' });
     const url = p.url().replace(BASE, '');
     await p.close();
     return url;
   };
-  const root = await visit('/');
-  const hash = await visit('/#progress');
-  const bypass = await visit('/?landing=1');
-  ok('a returning user at / goes straight to the app', root === '/app.html', root);
+  const browserCtx = await browser.newContext();
+  await seedData(browserCtx);
+  const inBrowser = await visit(browserCtx, '/');
+  ok('a returning user in a browser still sees the landing page at /', inBrowser === '/', inBrowser);
+  await browserCtx.close();
+  // The installed app reports display-mode: standalone; emulate that.
+  const appCtx = await browser.newContext();
+  await appCtx.addInitScript(() => {
+    const real = window.matchMedia.bind(window);
+    window.matchMedia = (q) => /display-mode:\s*standalone/.test(q) ? { matches: true, media: q, addEventListener() {}, removeEventListener() {} } : real(q);
+  });
+  await seedData(appCtx);
+  const root = await visit(appCtx, '/');
+  const hash = await visit(appCtx, '/#progress');
+  const bypass = await visit(appCtx, '/?landing=1');
+  ok('the installed app (old start URL) goes straight into the app', root === '/app.html', root);
   ok('the forward keeps the #view from the URL', hash === '/app.html#progress', hash);
-  ok('?landing=1 shows the landing page even with stored data', bypass === '/?landing=1', bypass);
+  ok('?landing=1 shows the landing page even in the installed app', bypass === '/?landing=1', bypass);
+  await appCtx.close();
+}
+
+// ---------- 17b. "Start now" on the landing page leads to profile setup ----------
+{
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const page = await ctx.newPage();
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' });
+  const ctas = await page.evaluate(() => [...document.querySelectorAll('[data-start-now]')].map((a) => a.textContent.trim() + ' -> ' + a.getAttribute('href')));
+  ok('the landing page has "Start now" buttons that open profile setup',
+     ctas.length === 2 && ctas.every((c) => /^Start now/.test(c) && /app\.html\?setup=1$/.test(c)), ctas.join(' | '));
+  await page.click('.lp-hero [data-start-now]');
+  await page.waitForLoadState('networkidle');
+  const first = await page.evaluate(() => ({ ob: !!document.querySelector('.onboarding'), url: location.pathname + location.search }));
+  ok('a new visitor pressing Start now gets the setup', first.ob && first.url.endsWith('/app.html'), JSON.stringify(first));
+  // Same button for someone who already has data: setup opens, routines are kept.
+  await page.click('.ob-skip');
+  await page.evaluate(() => { const d = JSON.parse(localStorage.getItem('setwise-personal-v1')); d.routines = [{ id: 'mine', name: 'Mine', focus: 'x', notes: '', exercises: [] }]; localStorage.setItem('setwise-personal-v1', JSON.stringify(d)); });
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' });
+  ok('a returning visitor in a browser lands on the landing page', page.url() === BASE + '/', page.url());
+  await page.click('.lp-hero [data-start-now]');
+  await page.waitForLoadState('networkidle');
+  ok('a returning visitor pressing Start now also gets the setup', await page.locator('.onboarding').count() > 0);
+  for (let i = 0; i < 5; i++) await page.click('.ob-foot .button-primary');
+  await page.waitForTimeout(300);
+  const names = await page.evaluate(() => JSON.parse(localStorage.getItem('setwise-personal-v1')).routines.map((r) => r.name));
+  ok('their existing routines are kept when the plan is created', names[0] === 'Mine' && names.length > 1, names.join(' | '));
+  await page.reload({ waitUntil: 'networkidle' });
+  ok('reloading afterwards does not reopen setup', await page.locator('.onboarding').count() === 0);
   await ctx.close();
 }
 
@@ -834,7 +876,12 @@ const contrastFailures = (page) => page.evaluate(() => {
   await offlineApp.goto(BASE + '/app.html', { waitUntil: 'domcontentloaded' });
   await offlineApp.waitForTimeout(800);
   const appOk = await offlineApp.evaluate(() => (document.querySelector('#app-content') || {}).textContent?.length > 50);
+  // An old install launches "./" in standalone display mode; emulate that for this page.
   const oldStart = await ctx.newPage();
+  await oldStart.addInitScript(() => {
+    const real = window.matchMedia.bind(window);
+    window.matchMedia = (q) => /display-mode:\s*standalone/.test(q) ? { matches: true, media: q, addEventListener() {}, removeEventListener() {} } : real(q);
+  });
   await oldStart.goto(BASE + '/', { waitUntil: 'domcontentloaded' });
   await oldStart.waitForTimeout(800);
   ok('offline, the installed app still opens', appOk === true);

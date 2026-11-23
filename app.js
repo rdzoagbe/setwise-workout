@@ -473,6 +473,13 @@ const applyTheme = t => document.documentElement.setAttribute('data-theme', t ==
   // #toast-root is available. Keep it on screen long enough to actually be read.
   if (RECOVERY_NOTICE) notify(RECOVERY_NOTICE, 'error');
   if (FIRST_RUN) openOnboarding();
+  // "Start now" on the landing page links here with ?setup=1. A new visitor already gets
+  // setup above; someone with data gets it too (their routines are kept). Never on top
+  // of a workout in progress. The parameter is removed so a reload does not reopen it.
+  if (/[?&]setup=1(&|$)/.test(location.search)) {
+    history.replaceState(null, '', location.pathname + location.hash);
+    if (!FIRST_RUN) { if (db.activeWorkout) { nav('train'); notify('Finish or discard your workout first, then set up your plan from Settings.'); } else openOnboarding('existing'); }
+  }
   // Resume a rest timer that was running when the page was closed or reloaded.
   { let t = Number(db.activeWorkout?.restEndsAt) || 0;
     if (t > Date.now()) startRest(Math.ceil((t - Date.now()) / 1000));
